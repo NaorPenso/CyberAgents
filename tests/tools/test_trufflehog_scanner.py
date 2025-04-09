@@ -90,7 +90,7 @@ class TestTruffleHogScannerTool(unittest.TestCase):
         ):
             result = tool._run(repo_target="local:/fake/repo")
             assert "TruffleHog Scan Results" in result
-            assert "Total findings: 1" in result
+            assert "**Total findings:** 1" in result
             assert "HIGH: 1" in result
             assert "config.py:10" in result
             assert "AWSKey" in result
@@ -101,28 +101,40 @@ class TestTruffleHogScannerTool(unittest.TestCase):
     @patch("shutil.which", return_value="/fake/path/to/executable")
     def test_scan_github_repo(self, mock_which, mock_run):
         """Test scanning a remote GitHub repo."""
-        tool = TruffleHogScannerTool()  # Initialize tool within test
-        # Mock the subprocess.run for both git clone and trufflehog scan
+        tool = TruffleHogScannerTool()
         mock_clone_process = MagicMock(returncode=0, stdout="Cloned.", stderr="")
-        mock_scan_process = MagicMock(returncode=0, stdout="", stderr="")  # No findings
+        mock_scan_process = MagicMock(returncode=0, stdout="", stderr="")
         mock_run.side_effect = [mock_clone_process, mock_scan_process]
 
         with patch("tempfile.TemporaryDirectory") as mock_tempdir:
-            mock_tempdir.return_value.__enter__.return_value = "/fake/tempdir"
-            result = tool._run(repo_target="github:owner/repo")
-            assert "No secrets" in result
-            assert mock_run.call_count == 2
-            # Check git clone call
-            clone_call_args = mock_run.call_args_list[0][0][0]
-            assert "git" in clone_call_args[0]
-            assert "clone" in clone_call_args
-            assert "https://github.com/owner/repo.git" in clone_call_args
-            assert "/fake/tempdir" in clone_call_args
-            # Check trufflehog scan call
-            scan_call_args = mock_run.call_args_list[1][0][0]
-            assert "trufflehog" in scan_call_args[0]
-            assert "filesystem" in scan_call_args
-            assert "/fake/tempdir" in scan_call_args
+            fake_temp_path = "/fake/tempdir/repo"
+            mock_tempdir.return_value.__enter__.return_value = fake_temp_path
+            with (
+                patch("os.path.exists") as mock_exists,
+                patch("os.path.isdir") as mock_isdir,
+            ):
+                mock_exists.return_value = True
+                mock_isdir.return_value = True
+                result = tool._run(repo_target="github:owner/repo")
+
+                # Assertions
+                self.assertIn("No secrets or sensitive information detected", result)
+                mock_exists.assert_any_call(fake_temp_path)
+                mock_isdir.assert_any_call(fake_temp_path)
+                self.assertEqual(mock_run.call_count, 2)
+                # Check clone command
+                clone_call_args = mock_run.call_args_list[0][0][0]
+                # Check if the mocked git executable path is the first arg
+                self.assertEqual(clone_call_args[0], tool._git_executable)
+                self.assertIn("clone", clone_call_args)
+                self.assertIn("https://github.com/owner/repo.git", clone_call_args)
+                self.assertIn(fake_temp_path, clone_call_args)
+                # Check scan command
+                scan_call_args = mock_run.call_args_list[1][0][0]
+                # Check if the mocked trufflehog executable path is the first arg
+                self.assertEqual(scan_call_args[0], tool._trufflehog_executable)
+                self.assertIn("filesystem", scan_call_args)
+                self.assertIn(fake_temp_path, scan_call_args)
 
     @patch("shutil.which", return_value=None)  # Simulate missing dependencies
     def test_tool_unavailable(self, mock_which):
@@ -165,10 +177,11 @@ class TestTruffleHogScannerTool(unittest.TestCase):
             }
         )
         result = tool._process_scan_results(mock_stdout)
-        assert "Total findings: 1" in result
-        assert "MEDIUM: 1" in result
-        assert "TestDetector" in result
-        assert "config.py:10" in result
+        assert "**Total findings:** 1" in result
+        self.assertIn("| Severity |", result)
+        self.assertIn("| MEDIUM", result)
+        self.assertIn("| TestDetector", result)
+        self.assertIn("config.py:10", result)
         assert "`some_secret_value`" in result
 
 

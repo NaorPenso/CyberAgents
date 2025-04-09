@@ -5,11 +5,9 @@ import copy
 import json
 import os
 
-
 import pytest
-from crewai import Agent, Crew, Task, Process
+from crewai import Agent, Crew, Process, Task
 from dotenv import load_dotenv
-
 from langchain_openai import ChatOpenAI
 
 from tools import DNSTool, ThreatTool, WhoisTool

@@ -5,10 +5,10 @@ This agent receives security findings from the AppSec Engineer Agent and generat
 concrete recommendations for fixing the identified issues.
 """
 
-from typing import Dict, Optional
 from pathlib import Path
-import yaml
+from typing import Dict, Optional
 
+import yaml
 from crewai import Agent
 
 from agents.base_agent import BaseAgent
