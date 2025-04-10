@@ -35,14 +35,13 @@ class ASNIPInput(BaseModel):
 
 
 class ASNIPLookupTool(BaseTool):
-    """Tool for querying WHOIS data for an IP address to find ASN and network blocks."""
+    """Tool for querying WHOIS data for an IP address to find ASN and netblocks."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     name: ClassVar[str] = "asn_ip_lookup"
     description: str = (
-        "Looks up the ASN and network blocks for a given IP address. "
-        "Useful for identifying the network ownership of IP addresses."
+        "Looks up the ASN (Autonomous System Number), associated IP network blocks (CIDRs), and organization name for a given IP address using WHOIS data."
     )
     input_schema: ClassVar[type] = ASNIPInput
 

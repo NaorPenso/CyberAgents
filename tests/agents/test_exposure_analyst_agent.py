@@ -60,7 +60,7 @@ def test_exposure_analyst_agent_initialization(
         # Check that expected tools were added based on mocks
         assert "subdomain_finder_crtsh" in tool_names
         assert "asn_ip_lookup" in tool_names
-        assert "nmap_port_scanner" in tool_names  # Should now be added
+        assert "nmap_port_scanner" in tool_names
         assert "shodan_host_search" in tool_names
 
         assert len(agent_instance.agent.tools) == 4  # Expecting all 4 tools with mocks
