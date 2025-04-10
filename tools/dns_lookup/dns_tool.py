@@ -50,7 +50,7 @@ class DNSTool(BaseTool):
             try:
                 answers = resolver.resolve(domain, "DNSKEY")
                 results["dnssec"] = True
-            except:
+            except BaseException:
                 results["dnssec"] = False
 
             return results

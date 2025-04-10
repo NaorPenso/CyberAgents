@@ -10,6 +10,7 @@ import logging
 from crewai import Agent
 
 from tools.whois_lookup.whois_tool import WhoisTool
+
 from ..base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)

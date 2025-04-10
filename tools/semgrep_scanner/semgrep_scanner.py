@@ -5,6 +5,17 @@ This tool allows scanning code snippets or files for security vulnerabilities
 using Semgrep, a static analysis engine for finding bugs and enforcing code standards.
 """
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from crewai.tools import BaseTool
+from typing import Any, ClassVar, Collection, Dict, List, Optional, Type, Union
+from pathlib import Path
+import tempfile
+import subprocess
+import re
+import logging
+import json
+import asyncio  # Add asyncio import for async support
+import argparse
 import importlib
 import os
 
@@ -56,25 +67,13 @@ RateLimiter = import_rate_limiter()
 # --- End: Dynamic import ---
 
 # Add the import for argparse
-import argparse
-import asyncio  # Add asyncio import for async support
 
 # import asyncio # Unused
-import json
-import logging
-import os
-import re
 
 # import shlex # Unused
-import subprocess
-import tempfile
-from pathlib import Path
 
 # Add Any back to the import
-from typing import Any, ClassVar, Collection, Dict, List, Optional, Type, Union
 
-from crewai.tools import BaseTool
-from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Import was replaced with dynamic import above
 # from utils.rate_limiter import RateLimiter

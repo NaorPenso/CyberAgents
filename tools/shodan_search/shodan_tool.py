@@ -2,7 +2,6 @@
 
 import logging
 import os
-
 from typing import Any, ClassVar, Dict, Optional
 
 import shodan

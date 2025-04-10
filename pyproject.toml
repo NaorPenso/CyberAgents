@@ -61,6 +61,7 @@ test = ["pytest-picked"]
 
 [tool.poetry.group.dev.dependencies]
 check-jsonschema = "^0.32.1"
+autopep8 = "^2.3.2"
 
 [build-system]
 requires = ["poetry-core"]

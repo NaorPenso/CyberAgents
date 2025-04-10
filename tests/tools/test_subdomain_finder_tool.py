@@ -1,10 +1,10 @@
 """Tests for the SubdomainFinderTool, including input validation."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 import pytest
 import requests
-import json
 
 from tools import SubdomainFinderTool
 from tools.subdomain_finder.subdomain_finder_tool import SubdomainInput
