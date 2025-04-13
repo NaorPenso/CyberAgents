@@ -1,20 +1,17 @@
 ---
 $schema: http://json-schema.org/draft-07/schema#
 title: CyberAgents Tool Schema
-description: Schema for defining tools used by AI-powered cybersecurity agents
+description: Schema for defining tool configurations used by AI-powered cybersecurity agents
 type: object
 required:
   - tool
-  - implementation
-  - parameters
-  - examples
+  - configuration
 
 properties:
   tool:
     type: object
     required:
       - name
-      - type
       - description
       - version
     properties:
@@ -22,10 +19,6 @@ properties:
         type: string
         pattern: "^[a-z0-9_]+$"
         description: "Unique identifier for the tool (lowercase, underscores)"
-      type:
-        type: string
-        enum: [python, shell, api]
-        description: "Type of tool implementation"
       description:
         type: string
         description: "Detailed description of the tool's purpose and functionality"
@@ -34,64 +27,29 @@ properties:
         pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
         description: "Semantic version of the tool"
 
-  implementation:
+  configuration:
     type: object
     required:
-      - language
+      - parameters
       - dependencies
-      - code
     properties:
-      language:
-        type: string
-        description: "Programming language used for implementation"
+      parameters:
+        type: object
+        description: "Configuration parameters for the tool"
+        additionalProperties: true
+        properties:
+          type:
+            type: string
+            enum: [string, number, boolean, object, array]
+          description:
+            type: string
+          required:
+            type: boolean
+            default: true
+          default:
+            type: string
       dependencies:
         type: array
         items:
           type: string
-        description: "List of required dependencies"
-      code:
-        type: string
-        description: "Implementation code or reference to implementation file"
-
-  parameters:
-    type: array
-    description: "List of parameters accepted by the tool"
-    items:
-      type: object
-      required:
-        - name
-        - type
-        - description
-      properties:
-        name:
-          type: string
-        type:
-          type: string
-          enum: [string, number, boolean, object, array]
-        description:
-          type: string
-        required:
-          type: boolean
-          default: true
-        default:
-          type: string
-          description: "Default value if parameter is optional"
-
-  examples:
-    type: array
-    description: "Example usage of the tool"
-    items:
-      type: object
-      required:
-        - description
-        - input
-        - output
-      properties:
-        description:
-          type: string
-        input:
-          type: object
-          additionalProperties: true
-        output:
-          type: object
-          additionalProperties: true
+        description: "List of required Python package dependencies"

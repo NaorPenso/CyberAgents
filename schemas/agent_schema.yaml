@@ -1,7 +1,7 @@
 ---
 $schema: http://json-schema.org/draft-07/schema#
-title: CyberAgents Agent Configuration Schema (Simplified)
-description: Describes the core configuration of a CrewAI agent, mirroring common Agent parameters.
+title: CyberAgents Agent Configuration Schema
+description: Describes the configuration of a CrewAI agent, including core parameters and advanced settings.
 type: object
 required:
   - role
@@ -11,6 +11,7 @@ required:
   - allow_delegation
 
 properties:
+  # Core Agent Parameters
   role:
     type: string
     description: "The specific role the agent plays in the crew (e.g., WHOIS Analyst)."
@@ -36,6 +37,121 @@ properties:
     type: boolean
     description: "Enable memory for the agent (true/false). Defaults usually to false."
     default: false
-  # llm_config could be added as an object if needed
 
-additionalProperties: false # Disallow properties not defined in the schema
+  # Advanced Configuration
+  llm_config:
+    type: object
+    description: "Language Model configuration for the agent."
+    properties:
+      model:
+        type: string
+        description: "The LLM model to use (e.g., 'gpt-4', 'gpt-3.5-turbo')."
+      temperature:
+        type: number
+        description: "Temperature setting for the LLM."
+        minimum: 0
+        maximum: 2
+        default: 0.7
+      api_key:
+        type: string
+        description: "API key for the LLM service."
+      base_url:
+        type: string
+        description: "Base URL for the LLM service (for custom endpoints)."
+    additionalProperties: false
+
+  function_calling_llm:
+    type: object
+    description: "Optional LLM configuration specifically for function calling."
+    properties:
+      model:
+        type: string
+        description: "The LLM model to use for function calling."
+      temperature:
+        type: number
+        description: "Temperature setting for the function calling LLM."
+        minimum: 0
+        maximum: 2
+        default: 0.7
+    additionalProperties: false
+
+  # Performance Settings
+  max_iterations:
+    type: integer
+    description: "Maximum number of iterations for the agent to perform."
+    minimum: 1
+    default: 15
+  max_rpm:
+    type: integer
+    description: "Maximum requests per minute for the agent."
+    minimum: 1
+    default: 60
+  cache:
+    type: boolean
+    description: "Enable/disable caching for the agent."
+    default: true
+
+  # Security Settings
+  security_context:
+    type: object
+    description: "Security context and permissions for the agent."
+    properties:
+      allowed_domains:
+        type: array
+        description: "List of domains the agent is allowed to interact with."
+        items:
+          type: string
+      max_request_size:
+        type: integer
+        description: "Maximum size of requests in bytes."
+        minimum: 1
+        default: 1048576  # 1MB
+      timeout:
+        type: integer
+        description: "Timeout in seconds for operations."
+        minimum: 1
+        default: 30
+      allow_internet_access:
+        type: boolean
+        description: "Whether the agent is allowed to make external network requests."
+        default: false
+      logging_level:
+        type: string
+        description: "Logging level for the agent's operations."
+        enum: ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+        default: "INFO"
+      allow_code_execution:
+        type: boolean
+        description: "Whether the agent is allowed to execute code or scripts."
+        default: false
+      allow_ocr:
+        type: boolean
+        description: "Whether the agent is allowed to perform OCR operations on images or documents."
+        default: false
+      allow_file_analysis:
+        type: boolean
+        description: "Whether the agent is allowed to analyze file contents."
+        default: false
+      file_analysis_limits:
+        type: object
+        description: "Limits for file analysis operations."
+        properties:
+          max_file_size:
+            type: integer
+            description: "Maximum file size in bytes that can be analyzed."
+            minimum: 1
+            default: 5242880  # 5MB
+          allowed_extensions:
+            type: array
+            description: "List of file extensions that can be analyzed."
+            items:
+              type: string
+          disallowed_extensions:
+            type: array
+            description: "List of file extensions that cannot be analyzed."
+            items:
+              type: string
+        additionalProperties: false
+    additionalProperties: false
+
+additionalProperties: false

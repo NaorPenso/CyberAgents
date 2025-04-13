@@ -1,0 +1,37 @@
+---
+tool:
+  name: "virustotal_file_submission"
+  description: "Submits files to VirusTotal for malware analysis and retrieves scan results"
+  version: "1.0.0"
+
+configuration:
+  parameters:
+    api_key:
+      type: string
+      description: "VirusTotal API key (can be set via environment variable VIRUSTOTAL_API_KEY)"
+      required: true
+    max_file_size:
+      type: number
+      description: "Maximum file size in bytes that can be submitted (default: 32MB)"
+      required: false
+      default: "33554432"
+    wait_for_result:
+      type: boolean
+      description: "Whether to wait for analysis completion (default: true)"
+      required: false
+      default: "true"
+    timeout:
+      type: number
+      description: "Timeout in seconds for waiting for results (default: 300)"
+      required: false
+      default: "300"
+    allowed_file_types:
+      type: array
+      description: "List of allowed file extensions"
+      required: false
+      default: "['exe', 'dll', 'msi', 'zip', 'rar', '7z', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'js', 'vbs', 'ps1', 'py', 'jar', 'class', 'apk', 'ipa']"
+
+  dependencies:
+    - "vt-py"
+    - "python-magic"
+    - "requests" 

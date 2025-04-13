@@ -1,0 +1,95 @@
+---
+# Malware Analysis Agent Configuration
+# This agent specializes in analyzing payloads for malicious behavior and indicators of compromise
+
+# Core Agent Parameters
+role: "Malware Analysis Specialist"
+goal: "Analyze payloads for malicious behavior, identify indicators of compromise, and provide detailed threat assessment."
+backstory: |
+  You are an expert malware analyst with extensive experience in reverse engineering and behavioral analysis.
+  Your expertise lies in identifying malicious patterns, analyzing code behavior, and detecting sophisticated
+  evasion techniques. You meticulously examine payloads to uncover hidden threats and provide actionable
+  intelligence about potential security risks.
+
+tools:
+  - "static_analysis"
+  - "dynamic_analysis"
+  - "yara_scan"
+  - "hash_analysis"
+  - "string_analysis"
+  - "entropy_analysis"
+  - "pe_analysis"
+  - "network_behavior"
+
+allow_delegation: false
+verbose: true
+memory: true
+
+# Advanced Configuration
+llm_config:
+  model: "gpt-4"
+  temperature: 0.3  # Lower temperature for more precise analysis
+  api_key: "${OPENAI_API_KEY}"
+  base_url: "https://api.openai.com/v1"
+
+function_calling_llm:
+  model: "gpt-3.5-turbo"
+  temperature: 0.2  # Even lower temperature for function calls
+
+# Performance Settings
+max_iterations: 15  # More iterations for thorough analysis
+max_rpm: 20  # Lower RPM for careful processing
+cache: true
+
+# Security Settings
+security_context:
+  allowed_domains:
+    - "virustotal.com"
+    - "hybrid-analysis.com"
+    - "malwarebazaar.abuse.ch"
+    - "urlhaus.abuse.ch"
+    - "threatfox.abuse.ch"
+  
+  max_request_size: 10485760  # 10MB for larger samples
+  timeout: 60  # Longer timeout for analysis
+  
+  # Access Controls
+  allow_internet_access: true
+  logging_level: "DEBUG"  # More detailed logging for analysis
+  allow_code_execution: true  # Required for dynamic analysis
+  allow_ocr: true  # For analyzing images in samples
+  allow_file_analysis: true  # Core functionality
+  
+  # File Analysis Limits
+  file_analysis_limits:
+    max_file_size: 104857600  # 100MB for larger samples
+    allowed_extensions:
+      - "exe"
+      - "dll"
+      - "msi"
+      - "zip"
+      - "rar"
+      - "7z"
+      - "pdf"
+      - "doc"
+      - "docx"
+      - "xls"
+      - "xlsx"
+      - "ppt"
+      - "pptx"
+      - "js"
+      - "vbs"
+      - "ps1"
+      - "py"
+      - "jar"
+      - "class"
+      - "apk"
+      - "ipa"
+    disallowed_extensions:
+      - "bat"
+      - "cmd"
+      - "sh"
+      - "bash"
+      - "zsh"
+      - "csh"
+      - "ksh" 

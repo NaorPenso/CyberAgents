@@ -83,9 +83,7 @@ class SecurityManagerAgent(BaseAgent):
         super().__init__()
 
         # Load configuration from YAML file
-        config_path = os.path.join(
-            os.path.dirname(__file__), "agent.yaml"
-        )
+        config_path = os.path.join(os.path.dirname(__file__), "agent.yaml")
         loaded_config = self._load_config(config_path)
         if loaded_config is None:
             logger.error("Failed to load or validate agent configuration. Exiting.")
