@@ -9,12 +9,13 @@ import os
 
 import yaml
 from crewai import Agent
+from pydantic import Field, PrivateAttr
 
+from tools.github_search.github_search_tool import GitHubSearchTool
+from tools.trufflehog_scanner.trufflehog_scanner_tool import TruffleHogScannerTool
 from utils.llm_utils import create_llm
 
 from ..base_agent import BaseAgent
-from .git_search_tool import GitHubSearchTool
-from .trufflehog_scanner_tool import TruffleHogScannerTool
 
 logger = logging.getLogger(__name__)
 

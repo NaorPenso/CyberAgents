@@ -1,33 +1,75 @@
+---
 # Git Exposure Analyst Agent Configuration
+# Compliant with CyberAgents agent_schema.yaml
 
-name: GitExposureAnalystAgent
-display_name: Git Exposure Analyst
-version: 1.0.0
-description: >
-  An agent specialized in identifying exposed secrets and sensitive information in 
-  git repositories, either through direct GitHub searches or analysis of local repositories.
+# Core required fields
+role: Git Exposure Analyst
+goal: Identify exposed secrets and sensitive information in git repositories to reduce security risks.
+backstory: >
+  A specialized security researcher with deep expertise in identifying exposed secrets
+  and sensitive information in source code repositories. You're adept at using GitHub's
+  search capabilities and specialized tools like TruffleHog to discover accidentally
+  committed secrets, API keys, credentials, and other sensitive data that could lead
+  to security breaches.
+tools:
+  - github_search
+  - trufflehog_scanner
+allow_delegation: false
 
-# Agent Identity Configuration
-agent:
-  role: Git Exposure Analyst
-  goal: Identify exposed secrets and sensitive information in git repositories to reduce security risks.
-  backstory: >
-    A specialized security researcher with deep expertise in identifying exposed secrets
-    and sensitive information in source code repositories. You're adept at using GitHub's
-    search capabilities and specialized tools like TruffleHog to discover accidentally
-    committed secrets, API keys, credentials, and other sensitive data that could lead
-    to security breaches.
+# Optional fields
+verbose: true
+memory: false
 
-# Agent Capabilities
-capabilities:
-  - GitHub repository reconnaissance
-  - GitHub code search for patterns indicating secrets
-  - Local repository scanning using TruffleHog
-  - Secret validation and classification
-  - Risk assessment for exposed secrets
-  - Remediation recommendations
+# Advanced configuration
+max_iterations: 15
+max_rpm: 60
+cache: true
 
-# Analysis Settings
+# Security context
+security_context:
+  allowed_domains: []
+  max_request_size: 1048576  # 1MB
+  timeout: 30
+  allow_internet_access: true
+  logging_level: INFO
+  allow_code_execution: false
+  allow_ocr: false
+  allow_file_analysis: true
+  file_analysis_limits:
+    max_file_size: 5242880  # 5MB
+    allowed_extensions:
+      - .py
+      - .js
+      - .ts
+      - .java
+      - .json
+      - .yaml
+      - .yml
+      - .env
+      - .properties
+      - .sh
+    disallowed_extensions:
+      - .exe
+      - .bin
+      - .dll
+
+# Agent metadata - not used by CrewAI but maintained for documentation
+metadata:
+  name: GitExposureAnalystAgent
+  display_name: Git Exposure Analyst
+  version: 1.0.0
+  description: >
+    An agent specialized in identifying exposed secrets and sensitive information in 
+    git repositories, either through direct GitHub searches or analysis of local repositories.
+  capabilities:
+    - GitHub repository reconnaissance
+    - GitHub code search for patterns indicating secrets
+    - Local repository scanning using TruffleHog
+    - Secret validation and classification
+    - Risk assessment for exposed secrets
+    - Remediation recommendations
+
+# Analysis settings - will be accessed via config within the agent code
 settings:
   github_api:
     rate_limit_handling: true
