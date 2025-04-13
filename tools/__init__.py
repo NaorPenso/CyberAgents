@@ -10,6 +10,7 @@ from .shodan_search.shodan_tool import ShodanHostSearchTool
 from .subdomain_finder.subdomain_finder_tool import SubdomainFinderTool
 from .threat_intel_analyzer.threat_tool import ThreatTool
 from .whois_lookup.whois_tool import WhoisTool
+from .malware_analysis_tool import MalwareAnalysisTool
 
 __all__ = [
     "WhoisTool",
@@ -21,4 +22,5 @@ __all__ = [
     "ASNIPLookupTool",
     "NmapPortScanTool",
     "SemgrepTool",
+    "MalwareAnalysisTool",
 ]
