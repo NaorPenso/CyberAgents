@@ -12,11 +12,9 @@ import subprocess
 import tempfile
 from typing import Any, Dict, List, Optional, Tuple
 
+from crewai.tools import BaseTool
 import yaml
-from langchain.tools import BaseTool
-from pydantic import Field
-from pydantic.v1.fields import PrivateAttr
-
+from pydantic import ConfigDict, Field, PrivateAttr
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +31,9 @@ class TruffleHogScannerTool(BaseTool):
     _trufflehog_executable: Optional[str] = PrivateAttr(default=None)
     _git_executable: Optional[str] = PrivateAttr(default=None)
     _is_available: bool = PrivateAttr(default=False)
+    
+    # Add model config for Pydantic
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __init__(self, **kwargs):
         """Initialize the tool and check dependencies synchronously."""

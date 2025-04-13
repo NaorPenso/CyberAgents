@@ -9,9 +9,10 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
+from crewai.tools import BaseTool
+from pydantic import PrivateAttr, Field, ConfigDict
+
 import requests
-from langchain.tools import BaseTool
-from pydantic import Field
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +187,9 @@ class GitHubSearchTool(BaseTool):
         )
     )
     rate_limiter: Optional[GitHubRateLimiter] = None
+
+    # Add model config to allow arbitrary types (GitHubRateLimiter)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def __init__(self, **kwargs):
         """Initialize GitHub Search Tool with optional token."""
