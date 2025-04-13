@@ -5,6 +5,9 @@
 .cursor-log/
 .cursor-cache/
 
+# Project-specific tracking files
+agent_update_tracker.md
+
 # Python
 __pycache__/
 *.py[cod]
