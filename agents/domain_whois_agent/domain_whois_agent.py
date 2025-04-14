@@ -9,11 +9,12 @@ import os
 from typing import Any, ClassVar, Dict, List, Optional
 
 import yaml
-from ..base_agent import BaseAgent
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, ValidationError
 from crewai import Agent
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, ValidationError
 
 from tools.whois_lookup.whois_tool import WhoisTool
+
+from ..base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -119,14 +120,18 @@ class domain_whois_agent(BaseAgent):
         # Load configuration using the internal _load_config method
         loaded_config = self._load_config(config_path)
         if loaded_config is None:
-            logger.error("Failed to load or validate agent configuration. Initialization aborted.")
+            logger.error(
+                "Failed to load or validate agent configuration. Initialization aborted."
+            )
             # Optionally raise an error or handle it as needed
             raise ValueError("Agent configuration failed to load or validate.")
         self.config = loaded_config
 
         # Initialize tools
         self.tool_instances = {"whois_lookup": WhoisTool()}
-        agent_tools = [self.tool_instances[tool_name] for tool_name in self.config.tools]
+        agent_tools = [
+            self.tool_instances[tool_name] for tool_name in self.config.tools
+        ]
 
         # Explicitly create the crewai.Agent instance
         self.agent = Agent(
@@ -191,7 +196,7 @@ class domain_whois_agent(BaseAgent):
         except ValidationError as e:
             logger.error(f"Configuration validation failed for {config_path}:\n{e}")
             return None
-        except ValueError as e: # Catch specific ValueError from custom validation
+        except ValueError as e:  # Catch specific ValueError from custom validation
             logger.error(f"Configuration value error for {config_path}: {e}")
             return None
         except Exception as e:

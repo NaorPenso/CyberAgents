@@ -1,51 +1,21 @@
----
-# TEMPORARY PLACEHOLDER — TO BE REPLACED
-#
-# This is a temporary YAML structure for defect_review_agent.
-# Replace with full agent definition including metadata, responsibilities, tools, steps, inputs,
-# and outputs.
-
-agent:
-  name: DefectReviewAgent
-  uuid: "00000000-0000-0000-0000-000000000000"
-  responsibilities: >-
-    TODO: Define responsibilities for defect_review_agent.
-  description: "An agent that analyzes security vulnerabilities identified by the AppSec Engineer Agent and provides detailed remediation guidance and code examples for fixing the issues."
-  version: "1.0.0"
-  author: "CyberAgents Team"
-  type: specialized
-  capabilities:
-    - Vulnerability remediation
-    - Code fixing
-    - Security best practices
-    - Pattern recognition
-    - Code context analysis
-  config:
-    max_suggestions_per_finding: 3  # Maximum number of remediation suggestions per finding
-    prioritize_critical: true  # Prioritize critical and high severity findings
-    include_code_examples: true  # Include code examples in remediation suggestions
-  dependencies:
-    - AppSecEngineerAgent
-
-system_prompt: |
-  TODO: Provide a system prompt for this agent.
-
+role: "Defect Reviewer"
+goal: "Analyze security vulnerabilities, investigate their context, and provide comprehensive remediation strategies including code fixes, infrastructure mitigations, and temporary compensating controls."
+backstory: |
+  You are a meticulous Defect Reviewer with extensive experience in application security, 
+  network security, and defensive infrastructure. Your expertise spans across code-level 
+  vulnerabilities, infrastructure security, and compensating controls. You excel at 
+  analyzing security vulnerabilities in their full deployment context, considering exposure, 
+  existing security controls, and business impact. Your holistic approach ensures that 
+  remediation strategies address both the immediate vulnerability and enhance the overall 
+  security posture of the system.
 tools: []
-external_knowledge: []
-inputs:
-  - name: findings
-    description: "Security findings from AppSec Engineer Agent"
-    type: object
-    required: true
-  - name: code
-    description: "Original code with vulnerabilities"
-    type: string
-    required: false
-outputs:
-  - name: remediation_suggestions
-    description: "List of remediation suggestions for each finding"
-    type: array
-  - name: summary
-    description: "Summary of remediation advice"
-    type: object
-steps: []
+#  - "network_topology_analyzer"
+#  - "waf_rule_generator"
+#  - "vulnerability_context_enricher"
+#  - "risk_calculator"
+allow_delegation: true
+verbose: true
+memory: false
+max_iterations: 15
+max_rpm: 60
+cache: true

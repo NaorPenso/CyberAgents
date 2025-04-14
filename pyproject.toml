@@ -55,6 +55,9 @@ opentelemetry-instrumentation-asgi = "0.52b1"
 opentelemetry-instrumentation-fastapi = "0.52b1"
 opentelemetry-semantic-conventions = "0.52b1"
 opentelemetry-util-http = "0.52b1"
+boto3 = "^1.37.33"
+azure-mgmt-frontdoor = "^1.2.0"
+azure-identity = "^1.21.0"
 
 [tool.poetry.extras]
 test = ["pytest-picked"]
@@ -63,6 +66,8 @@ test = ["pytest-picked"]
 check-jsonschema = "^0.32.1"
 autopep8 = "^2.3.2"
 flake8-bugbear = "^24.12.12"
+pytest-asyncio = "^0.26.0"
+responses = "^0.25.7"
 
 [build-system]
 requires = ["poetry-core"]

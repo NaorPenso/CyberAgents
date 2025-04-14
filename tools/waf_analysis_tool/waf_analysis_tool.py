@@ -1,13 +1,15 @@
-"""WAF Analysis Tool for retrieving configuration and assets from WAF providers.
+"""WAF Analysis Tool for connecting to and analyzing WAF configurations.
 
-This tool connects to various Web Application Firewall providers (Imperva, Cloudflare,
-AWS WAF, and Azure WAF) to retrieve configuration details and information about
-protected assets.
+This tool connects to various Web Application Firewall (WAF) providers including
+Imperva, Cloudflare, AWS, and Azure to retrieve configurations and information
+about protected assets.
 """
 
 import logging
 import os
-from typing import Any, ClassVar, Dict, Optional
+import yaml
+from pathlib import Path
+from typing import Any, ClassVar, Dict, List, Optional
 
 import boto3
 import requests
@@ -15,66 +17,158 @@ from azure.identity import ClientSecretCredential
 from azure.mgmt.frontdoor import FrontDoorManagementClient
 from crewai.tools import BaseTool
 from dotenv import load_dotenv
-from pydantic import BaseModel, ConfigDict, Field
-
-# Set up logging
-logger = logging.getLogger(__name__)
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Load environment variables
 load_dotenv()
 
+# Set up logging
+logger = logging.getLogger(__name__)
+
 
 class WAFAnalysisInput(BaseModel):
-    """Input model for the WAF Analysis Tool."""
+    """Input for WAF Analysis Tool."""
 
     provider: str = Field(
         ...,
-        description="WAF provider ('imperva', 'cloudflare', 'aws', 'azure')",
+        description="WAF provider to query ('imperva', 'cloudflare', 'aws', 'azure')",
     )
     query_type: str = Field(
         ...,
-        description="Info type ('configuration', 'assets', 'rules')",
+        description="Type of information to retrieve ('configuration', 'assets', 'rules')",
     )
     resource_id: Optional[str] = Field(
         None, description="Specific resource ID to query (if applicable)"
     )
 
-    model_config = ConfigDict(extra="forbid")
+    @field_validator("provider")
+    @classmethod
+    def validate_provider(cls, v):
+        """Validate that the provider is supported."""
+        valid_providers = ["imperva", "cloudflare", "aws", "azure"]
+        if v.lower() not in valid_providers:
+            raise ValueError(f"Provider must be one of: {', '.join(valid_providers)}")
+        return v.lower()
+
+    @field_validator("query_type")
+    @classmethod
+    def validate_query_type(cls, v):
+        """Validate that the query type is supported."""
+        valid_query_types = ["configuration", "assets", "rules"]
+        if v.lower() not in valid_query_types:
+            raise ValueError(
+                f"Query type must be one of: {', '.join(valid_query_types)}"
+            )
+        return v.lower()
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
 class WAFAnalysisTool(BaseTool):
-    """Tool for analyzing web application firewall configurations and protected assets.
+    """Tool for analyzing Web Application Firewall configurations.
 
     This tool connects to various WAF providers (Imperva, Cloudflare, AWS, Azure)
     to retrieve configuration details and information about protected assets.
     """
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)
-
     name: ClassVar[str] = "waf_analysis_tool"
     description: str = (
-        "Analyzes WAF configurations and protected assets from "
-        "Imperva, Cloudflare, AWS, and Azure."
+        "Analyzes web application firewall configurations and protected assets "
+        "from multiple providers including Imperva, Cloudflare, AWS, and Azure."
     )
     input_schema: ClassVar[type] = WAFAnalysisInput
 
-    # API endpoints
-    IMPERVA_API_URL: str = os.getenv(
-        "IMPERVA_API_URL", "https://api.imperva.com/api/v1"
-    )
-    CLOUDFLARE_API_URL: str = os.getenv(
-        "CLOUDFLARE_API_URL", "https://api.cloudflare.com/client/v4"
-    )
-    AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
-    AZURE_API_VERSION: str = os.getenv("AZURE_API_VERSION", "2020-11-01")
+    # Configuration defaults (will be overridden by YAML config)
+    enabled_providers: List[str] = Field(default=["imperva", "cloudflare", "aws", "azure"])
+    imperva_api_url: str = Field(default="https://api.imperva.com/api/v1")
+    cloudflare_api_url: str = Field(default="https://api.cloudflare.com/client/v4")
+    aws_region: str = Field(default="us-east-1")
+    azure_api_version: str = Field(default="2020-11-01")
+    request_timeout: int = Field(default=30)
 
-    # Request timeout
-    REQUEST_TIMEOUT: int = int(os.getenv("WAF_REQUEST_TIMEOUT", "30"))
+    model_config = ConfigDict(arbitrary_types_allowed=True, extra="allow")
+
+    @classmethod
+    def _load_config_from_yaml(cls):
+        """Load configuration from tool.yaml file.
+        
+        Returns:
+            Dict containing configuration values
+        """
+        try:
+            # Get the directory containing this file
+            current_dir = Path(__file__).parent
+            config_path = current_dir / "tool.yaml"
+            
+            # Load YAML configuration
+            with open(config_path, "r") as file:
+                config = yaml.safe_load(file)
+            
+            # Extract parameters from configuration
+            parameters = config.get("configuration", {}).get("parameters", {})
+            
+            # Create a dictionary of configuration values
+            yaml_config = {
+                "enabled_providers": parameters.get("enabled_providers", {}).get("default", ["imperva", "cloudflare", "aws", "azure"]),
+                "imperva_api_url": parameters.get("imperva_api_url", {}).get("default", "https://api.imperva.com/api/v1"),
+                "cloudflare_api_url": parameters.get("cloudflare_api_url", {}).get("default", "https://api.cloudflare.com/client/v4"),
+                "aws_region": parameters.get("aws_region", {}).get("default", "us-east-1"),
+                "azure_api_version": parameters.get("azure_api_version", {}).get("default", "2020-11-01"),
+                "request_timeout": parameters.get("request_timeout", {}).get("default", 30),
+            }
+            
+            logger.info(f"Loaded WAF Analysis Tool configuration from {config_path}")
+            return yaml_config
+        except Exception as e:
+            # Log error but return defaults
+            logger.error(f"Error loading WAF Analysis Tool configuration: {str(e)}")
+            return {
+                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                "imperva_api_url": "https://api.imperva.com/api/v1",
+                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                "aws_region": "us-east-1",
+                "azure_api_version": "2020-11-01",
+                "request_timeout": 30,
+            }
+
+    def __init__(self, **kwargs):
+        """Initialize the WAF Analysis Tool."""
+        # Initialize with default values first
+        super().__init__(**kwargs)
+        
+        # Load configuration from YAML and update instance attributes
+        config = self._load_config_from_yaml()
+        for key, value in config.items():
+            setattr(self, key, value)
+
+        # Load API credentials from environment variables
+        self.imperva_api_key = os.getenv("IMPERVA_API_KEY")
+        self.cloudflare_api_key = os.getenv("CLOUDFLARE_API_KEY")
+        self.cloudflare_email = os.getenv("CLOUDFLARE_EMAIL")
+
+        # AWS credentials
+        self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
+        self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
+        
+        # Override AWS region from environment if specified
+        env_region = os.getenv("AWS_REGION")
+        if env_region:
+            self.aws_region = env_region
+
+        # Azure credentials
+        self.azure_client_id = os.getenv("AZURE_CLIENT_ID")
+        self.azure_client_secret = os.getenv("AZURE_CLIENT_SECRET")
+        self.azure_tenant_id = os.getenv("AZURE_TENANT_ID")
+
+        # Override request timeout from environment if specified
+        env_timeout = os.getenv("WAF_REQUEST_TIMEOUT")
+        if env_timeout:
+            self.request_timeout = int(env_timeout)
 
     def _run(
         self, provider: str, query_type: str, resource_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Run WAF analysis synchronously.
+        """Run WAF analysis for the specified provider.
 
         Args:
             provider: WAF provider to query ('imperva', 'cloudflare', 'aws', 'azure')
@@ -82,48 +176,32 @@ class WAFAnalysisTool(BaseTool):
             resource_id: Specific resource ID to query (if applicable)
 
         Returns:
-            Dictionary containing requested WAF information or error message
+            Dictionary containing the query results
         """
-        provider = provider.lower()
-        query_type = query_type.lower()
-
-        # Validate provider
-        if provider not in ["imperva", "cloudflare", "aws", "azure"]:
-            return {
-                "error": f"Unsupported provider: {provider}. "
-                "Supported providers are: imperva, cloudflare, aws, azure"
-            }
-
-        # Validate query type
-        if query_type not in ["configuration", "assets", "rules"]:
-            return {
-                "error": f"Unsupported query type: {query_type}. "
-                "Supported query types are: configuration, assets, rules"
-            }
-
+        # Check if the provider is enabled
+        if provider not in self.enabled_providers:
+            return {"error": f"Provider '{provider}' is not enabled in configuration"}
+            
         try:
-            # Call provider-specific method
+            # Call the appropriate provider method based on provider parameter
             if provider == "imperva":
-                return self._get_imperva_data(query_type, resource_id)
+                return self._query_imperva(query_type, resource_id)
             elif provider == "cloudflare":
-                return self._get_cloudflare_data(query_type, resource_id)
+                return self._query_cloudflare(query_type, resource_id)
             elif provider == "aws":
-                return self._get_aws_data(query_type, resource_id)
+                return self._query_aws(query_type, resource_id)
             elif provider == "azure":
-                return self._get_azure_data(query_type, resource_id)
+                return self._query_azure(query_type, resource_id)
             else:
                 return {"error": f"Unsupported provider: {provider}"}
         except Exception as e:
-            logger.exception(f"Error retrieving WAF data from {provider}: {e}")
-            return {"error": f"Error retrieving WAF data: {str(e)}"}
+            logger.exception(f"Error querying {provider} WAF: {str(e)}")
+            return {"error": f"Error querying {provider} WAF: {str(e)}"}
 
     async def _arun(
         self, provider: str, query_type: str, resource_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Run WAF analysis asynchronously.
-
-        This method is a wrapper around the synchronous method as the
-        implementation is primarily synchronous.
+        """Run WAF analysis asynchronously (wraps _run for now).
 
         Args:
             provider: WAF provider to query ('imperva', 'cloudflare', 'aws', 'azure')
@@ -131,608 +209,307 @@ class WAFAnalysisTool(BaseTool):
             resource_id: Specific resource ID to query (if applicable)
 
         Returns:
-            Dictionary containing requested WAF information or error message
+            Dictionary containing the query results
         """
+        # For simplicity, we're using the synchronous implementation
+        # In a real-world scenario, this would be an async implementation
         return self._run(provider, query_type, resource_id)
 
-    def _get_imperva_data(
+    def _query_imperva(
         self, query_type: str, resource_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get data from Imperva WAF.
+        """Query Imperva WAF API.
 
         Args:
             query_type: Type of information to retrieve
             resource_id: Specific site ID to query (if applicable)
 
         Returns:
-            Dictionary containing Imperva WAF data
+            Dictionary containing the Imperva WAF query results
         """
-        api_key = os.getenv("IMPERVA_API_KEY")
-        if not api_key:
-            return {"error": "Imperva API key not found in environment variables"}
+        if not self.imperva_api_key:
+            return {"error": "Imperva API key not configured"}
 
         headers = {
-            "Authorization": f"Bearer {api_key}",
+            "Authorization": f"Bearer {self.imperva_api_key}",
             "Content-Type": "application/json",
+            "Accept": "application/json",
         }
 
         try:
-            # Handle different query types
             if query_type == "assets":
-                # Get list of protected sites
-                endpoint = f"{self.IMPERVA_API_URL}/sites"
+                # List all protected sites
+                url = f"{self.imperva_api_url}/sites"
                 response = requests.get(
-                    endpoint, headers=headers, timeout=self.REQUEST_TIMEOUT
+                    url, headers=headers, timeout=self.request_timeout
                 )
                 response.raise_for_status()
                 return {"assets": response.json()}
 
             elif query_type == "configuration":
-                # Get site configuration
+                # Get configuration for a specific site
                 if not resource_id:
-                    return {"error": "Site ID is required for configuration queries"}
+                    return {"error": "Site ID required for configuration query"}
 
-                endpoint = f"{self.IMPERVA_API_URL}/sites/{resource_id}"
+                url = f"{self.imperva_api_url}/sites/{resource_id}"
                 response = requests.get(
-                    endpoint, headers=headers, timeout=self.REQUEST_TIMEOUT
+                    url, headers=headers, timeout=self.request_timeout
                 )
                 response.raise_for_status()
                 return {"configuration": response.json()}
 
             elif query_type == "rules":
-                # Get security rules
+                # Get security rules for a specific site
                 if not resource_id:
-                    return {"error": "Site ID is required for rules queries"}
+                    return {"error": "Site ID required for rules query"}
 
-                endpoint = f"{self.IMPERVA_API_URL}/sites/{resource_id}/security"
+                url = f"{self.imperva_api_url}/sites/{resource_id}/security"
                 response = requests.get(
-                    endpoint, headers=headers, timeout=self.REQUEST_TIMEOUT
+                    url, headers=headers, timeout=self.request_timeout
                 )
                 response.raise_for_status()
                 return {"rules": response.json()}
 
             else:
-                return {"error": f"Unsupported query type: {query_type}"}
+                return {"error": f"Unsupported query type for Imperva: {query_type}"}
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error querying Imperva API: {e}")
+        except requests.RequestException as e:
+            logger.exception(f"Error querying Imperva API: {str(e)}")
             return {"error": f"Error querying Imperva API: {str(e)}"}
 
-    def _get_cloudflare_data(
+    def _query_cloudflare(
         self, query_type: str, resource_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get data from Cloudflare WAF.
+        """Query Cloudflare WAF API.
 
         Args:
             query_type: Type of information to retrieve
             resource_id: Specific zone ID to query (if applicable)
 
         Returns:
-            Dictionary containing Cloudflare WAF data
+            Dictionary containing the Cloudflare WAF query results
         """
-        api_key = os.getenv("CLOUDFLARE_API_KEY")
-        email = os.getenv("CLOUDFLARE_EMAIL")
+        if not self.cloudflare_api_key:
+            return {"error": "Cloudflare API key not configured"}
 
-        if not api_key:
-            return {"error": "Cloudflare API key not found in environment variables"}
+        # Configure headers based on available credentials
+        headers = {
+            "Content-Type": "application/json",
+        }
 
-        if not email and "X-Auth-Email" in api_key:
-            return {"error": "Cloudflare email not found in environment variables"}
-
-        # Determine authentication method
-        if api_key.startswith("Bearer "):
-            # Token-based auth
-            headers = {
-                "Authorization": api_key,
-                "Content-Type": "application/json",
-            }
+        # Use API token if available, otherwise use API key with email
+        if self.cloudflare_api_key.startswith("Bearer"):
+            headers["Authorization"] = self.cloudflare_api_key
         else:
-            # Key-based auth
-            headers = {
-                "X-Auth-Key": api_key,
-                "X-Auth-Email": email,
-                "Content-Type": "application/json",
-            }
+            if not self.cloudflare_email:
+                return {"error": "Cloudflare email not configured for API key auth"}
+            headers["X-Auth-Key"] = self.cloudflare_api_key
+            headers["X-Auth-Email"] = self.cloudflare_email
 
         try:
-            # Handle different query types
             if query_type == "assets":
-                # Get list of zones
-                endpoint = f"{self.CLOUDFLARE_API_URL}/zones"
+                # List all zones (domains)
+                url = f"{self.cloudflare_api_url}/zones"
                 response = requests.get(
-                    endpoint, headers=headers, timeout=self.REQUEST_TIMEOUT
+                    url, headers=headers, timeout=self.request_timeout
                 )
                 response.raise_for_status()
                 return {"assets": response.json()}
 
             elif query_type == "configuration":
-                # Get zone details
+                # Get WAF configuration for a specific zone
                 if not resource_id:
-                    return {"error": "Zone ID is required for configuration queries"}
+                    return {"error": "Zone ID required for configuration query"}
 
-                endpoint = f"{self.CLOUDFLARE_API_URL}/zones/{resource_id}"
+                url = f"{self.cloudflare_api_url}/zones/{resource_id}/firewall/waf/packages"
                 response = requests.get(
-                    endpoint, headers=headers, timeout=self.REQUEST_TIMEOUT
+                    url, headers=headers, timeout=self.request_timeout
                 )
                 response.raise_for_status()
                 return {"configuration": response.json()}
 
             elif query_type == "rules":
-                # Get WAF rules
+                # Get WAF rules for a specific zone
                 if not resource_id:
-                    return {"error": "Zone ID is required for rules queries"}
+                    return {"error": "Zone ID required for rules query"}
 
-                endpoint = (
-                    f"{self.CLOUDFLARE_API_URL}/zones/"
-                    f"{resource_id}/firewall/waf/packages"
-                )
+                url = f"{self.cloudflare_api_url}/zones/{resource_id}/firewall/rules"
                 response = requests.get(
-                    endpoint, headers=headers, timeout=self.REQUEST_TIMEOUT
+                    url, headers=headers, timeout=self.request_timeout
                 )
                 response.raise_for_status()
-                packages = response.json()
-
-                # Get rules for each package
-                rules = []
-                for package in packages.get("result", []):
-                    package_id = package.get("id")
-                    rules_endpoint = (
-                        f"{self.CLOUDFLARE_API_URL}/zones/{resource_id}/firewall/waf/"
-                        f"packages/{package_id}/rules"
-                    )
-                    rules_response = requests.get(
-                        rules_endpoint, headers=headers, timeout=self.REQUEST_TIMEOUT
-                    )
-                    rules_response.raise_for_status()
-                    rules.append(
-                        {
-                            "package": package.get("name"),
-                            "rules": rules_response.json().get("result", []),
-                        }
-                    )
-
-                return {"rules": rules}
+                return {"rules": response.json()}
 
             else:
-                return {"error": f"Unsupported query type: {query_type}"}
+                return {"error": f"Unsupported query type for Cloudflare: {query_type}"}
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error querying Cloudflare API: {e}")
+        except requests.RequestException as e:
+            logger.exception(f"Error querying Cloudflare API: {str(e)}")
             return {"error": f"Error querying Cloudflare API: {str(e)}"}
 
-    def _get_aws_data(
+    def _query_aws(
         self, query_type: str, resource_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get data from AWS WAF.
+        """Query AWS WAF API.
 
         Args:
             query_type: Type of information to retrieve
-            resource_id: Specific resource ID to query (if applicable)
+            resource_id: Specific Web ACL ID to query (if applicable)
 
         Returns:
-            Dictionary containing AWS WAF data
+            Dictionary containing the AWS WAF query results
         """
-        aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
-        aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-
-        if not aws_access_key or not aws_secret_key:
-            return {"error": "AWS credentials not found in environment variables"}
+        if not self.aws_access_key or not self.aws_secret_key:
+            return {"error": "AWS credentials not configured"}
 
         try:
-            # Initialize AWS WAF client
+            # Initialize AWS WAFv2 client
             wafv2_client = boto3.client(
                 "wafv2",
-                region_name=self.AWS_REGION,
-                aws_access_key_id=aws_access_key,
-                aws_secret_access_key=aws_secret_key,
+                region_name=self.aws_region,
+                aws_access_key_id=self.aws_access_key,
+                aws_secret_access_key=self.aws_secret_key,
             )
 
-            # Handle different query types
+            # Determine scope (REGIONAL or CLOUDFRONT) based on resource_id format if provided
+            scope = "REGIONAL"
+            if resource_id and "cloudfront" in resource_id.lower():
+                scope = "CLOUDFRONT"
+
             if query_type == "assets":
-                # Get list of Web ACLs (both global and regional)
-                global_acls = wafv2_client.list_web_acls(Scope="CLOUDFRONT")
-                regional_acls = wafv2_client.list_web_acls(Scope="REGIONAL")
-
-                # Get associated resources for each ACL
-                assets = []
-                for acl in global_acls.get("WebACLs", []) + regional_acls.get(
-                    "WebACLs", []
-                ):
-                    acl_id = acl.get("Id")
-                    acl_name = acl.get("Name")
-                    acl_arn = acl.get("ARN")
-
-                    # Determine scope from ARN
-                    scope = "CLOUDFRONT" if ":global/webacl/" in acl_arn else "REGIONAL"
-
-                    # Get resources for this ACL
-                    resources = wafv2_client.list_resources_for_web_acl(
-                        WebACLArn=acl_arn,
-                        ResourceType="APPLICATION_LOAD_BALANCER",
-                    )
-
-                    assets.append(
-                        {
-                            "acl_id": acl_id,
-                            "acl_name": acl_name,
-                            "scope": scope,
-                            "resources": resources.get("ResourceArns", []),
-                        }
-                    )
-
-                return {"assets": assets}
+                # List all Web ACLs
+                response = wafv2_client.list_web_acls(Scope=scope, Limit=100)
+                return {"assets": response.get("WebACLs", [])}
 
             elif query_type == "configuration":
                 # Get Web ACL configuration
                 if not resource_id:
-                    return {
-                        "error": "Web ACL ID and scope required for configuration queries"
-                    }
+                    return {"error": "Web ACL ID required for configuration query"}
 
-                # Parse resource_id to get ACL ID and scope
-                if ":" in resource_id:
-                    acl_id, scope = resource_id.split(":", 1)
-                else:
-                    acl_id = resource_id
-                    scope = "REGIONAL"  # Default to regional
+                # Parse the ARN or ID from resource_id
+                acl_id, acl_name = self._parse_aws_resource_id(resource_id)
+                if not acl_id or not acl_name:
+                    return {"error": "Invalid Web ACL ID format"}
 
-                # Get ACLs first to find the ARN
-                acls = wafv2_client.list_web_acls(Scope=scope)
-                acl_arn = None
-                for acl in acls.get("WebACLs", []):
-                    if acl.get("Id") == acl_id or acl.get("Name") == acl_id:
-                        acl_arn = acl.get("ARN")
-                        break
-
-                if not acl_arn:
-                    return {"error": f"Web ACL ID {acl_id} not found in scope {scope}"}
-
-                # Get ACL configuration
-                acl_config = wafv2_client.get_web_acl(
-                    Name=acl.get("Name"), Scope=scope, Id=acl.get("Id")
+                response = wafv2_client.get_web_acl(
+                    Name=acl_name, Id=acl_id, Scope=scope
                 )
-
-                return {"configuration": acl_config}
+                return {"configuration": response.get("WebACL", {})}
 
             elif query_type == "rules":
                 # Get rule groups
-                regional_rule_groups = wafv2_client.list_rule_groups(Scope="REGIONAL")
-                global_rule_groups = wafv2_client.list_rule_groups(Scope="CLOUDFRONT")
-
-                rule_groups = []
-                # Process regional rule groups
-                for group in regional_rule_groups.get("RuleGroups", []):
-                    group_name = group.get("Name")
-                    group_id = group.get("Id")
-                    group_detail = wafv2_client.get_rule_group(
-                        Name=group_name, Scope="REGIONAL", Id=group_id
-                    )
-                    rule_groups.append(
-                        {
-                            "name": group_name,
-                            "id": group_id,
-                            "scope": "REGIONAL",
-                            "detail": group_detail,
-                        }
-                    )
-
-                # Process global rule groups
-                for group in global_rule_groups.get("RuleGroups", []):
-                    group_name = group.get("Name")
-                    group_id = group.get("Id")
-                    group_detail = wafv2_client.get_rule_group(
-                        Name=group_name, Scope="CLOUDFRONT", Id=group_id
-                    )
-                    rule_groups.append(
-                        {
-                            "name": group_name,
-                            "id": group_id,
-                            "scope": "CLOUDFRONT",
-                            "detail": group_detail,
-                        }
-                    )
-
-                return {"rules": rule_groups}
+                response = wafv2_client.list_rule_groups(Scope=scope, Limit=100)
+                return {"rules": response.get("RuleGroups", [])}
 
             else:
-                return {"error": f"Unsupported query type: {query_type}"}
+                return {"error": f"Unsupported query type for AWS: {query_type}"}
 
-        except boto3.exceptions.Boto3Error as e:
-            logger.error(f"Error querying AWS WAF: {e}")
-            return {"error": f"Error querying AWS WAF: {str(e)}"}
+        except Exception as e:
+            logger.exception(f"Error querying AWS WAF API: {str(e)}")
+            return {"error": f"Error querying AWS WAF API: {str(e)}"}
 
-    def _get_azure_data(
+    def _query_azure(
         self, query_type: str, resource_id: Optional[str] = None
     ) -> Dict[str, Any]:
-        """Get data from Azure WAF.
+        """Query Azure WAF API.
 
         Args:
             query_type: Type of information to retrieve
             resource_id: Specific resource ID to query (if applicable)
 
         Returns:
-            Dictionary containing Azure WAF data
+            Dictionary containing the Azure WAF query results
         """
-        client_id = os.getenv("AZURE_CLIENT_ID")
-        client_secret = os.getenv("AZURE_CLIENT_SECRET")
-        tenant_id = os.getenv("AZURE_TENANT_ID")
-        subscription_id = os.getenv("AZURE_SUBSCRIPTION_ID")
-
-        if not all([client_id, client_secret, tenant_id, subscription_id]):
-            return {"error": "Azure credentials not found in environment variables"}
+        # Check that all required Azure credentials are present
+        azure_creds = [
+            self.azure_client_id,
+            self.azure_client_secret,
+            self.azure_tenant_id,
+        ]
+        if not all(azure_creds):
+            return {"error": "Azure credentials not configured"}
 
         try:
-            # Create credential
+            # Create Azure credential
             credential = ClientSecretCredential(
-                tenant_id=tenant_id,
-                client_id=client_id,
-                client_secret=client_secret,
+                tenant_id=self.azure_tenant_id,
+                client_id=self.azure_client_id,
+                client_secret=self.azure_client_secret,
             )
 
-            # Create Front Door Management client
-            fd_client = FrontDoorManagementClient(
-                credential=credential, subscription_id=subscription_id
+            # Initialize FrontDoor client
+            frontdoor_client = FrontDoorManagementClient(
+                credential=credential,
+                subscription_id=resource_id if resource_id else "",
             )
 
-            # Handle different query types
             if query_type == "assets":
-                # Get list of Front Doors
-                front_doors = []
-                for fd in fd_client.front_doors.list():
-                    front_doors.append(
-                        {
-                            "id": fd.id,
-                            "name": fd.name,
-                            "location": fd.location,
-                            "resource_group": fd.id.split("/")[4],
-                            "frontend_endpoints": (
-                                [ep.name for ep in fd.frontend_endpoints]
-                                if hasattr(fd, "frontend_endpoints")
-                                else []
-                            ),
-                        }
-                    )
+                # List all front doors
+                if not resource_id:
+                    return {"error": "Subscription ID required for assets query"}
 
-                # Get list of WAF policies
-                waf_policies = []
-                for policy in fd_client.policies.list():
-                    waf_policies.append(
-                        {
-                            "id": policy.id,
-                            "name": policy.name,
-                            "resource_group": policy.id.split("/")[4],
-                            "policy_settings": (
-                                {
-                                    "enabled_state": (
-                                        policy.policy_settings.enabled_state
-                                        if hasattr(policy, "policy_settings")
-                                        else None
-                                    ),
-                                    "mode": (
-                                        policy.policy_settings.mode
-                                        if hasattr(policy, "policy_settings")
-                                        else None
-                                    ),
-                                }
-                                if hasattr(policy, "policy_settings")
-                                else {}
-                            ),
-                        }
-                    )
-
-                return {
-                    "assets": {"front_doors": front_doors, "waf_policies": waf_policies}
-                }
+                frontdoors = list(frontdoor_client.front_doors.list_all())
+                return {"assets": [fd.as_dict() for fd in frontdoors]}
 
             elif query_type == "configuration":
-                # Get specific Front Door or WAF policy
-                if not resource_id:
-                    return {
-                        "error": "Resource ID is required for configuration queries"
-                    }
-
-                # Check if resource_id is a Front Door or WAF policy
-                if "/frontdoors/" in resource_id.lower():
-                    # It's a Front Door
-                    resource_parts = resource_id.split("/")
-                    if len(resource_parts) >= 2:
-                        resource_group = resource_parts[0]
-                        front_door_name = resource_parts[1]
-                    else:
-                        return {
-                            "error": (
-                                "Invalid resource ID format. "
-                                "Expected: 'resource_group/front_door_name'"
-                            )
-                        }
-
-                    front_door = fd_client.front_doors.get(
-                        resource_group_name=resource_group,
-                        front_door_name=front_door_name,
-                    )
-
-                    # Convert to serializable dictionary
-                    fd_dict = {
-                        "id": front_door.id,
-                        "name": front_door.name,
-                        "location": front_door.location,
-                        "frontend_endpoints": (
-                            [
-                                {
-                                    "name": ep.name,
-                                    "web_application_firewall_policy_link": (
-                                        ep.web_application_firewall_policy_link.id
-                                        if hasattr(
-                                            ep, "web_application_firewall_policy_link"
-                                        )
-                                        else None
-                                    ),
-                                }
-                                for ep in front_door.frontend_endpoints
-                            ]
-                            if hasattr(front_door, "frontend_endpoints")
-                            else []
-                        ),
-                    }
-
-                    return {"configuration": fd_dict}
-
-                elif "/policies/" in resource_id.lower():
-                    # It's a WAF policy
-                    resource_parts = resource_id.split("/")
-                    if len(resource_parts) >= 2:
-                        resource_group = resource_parts[0]
-                        policy_name = resource_parts[1]
-                    else:
-                        return {
-                            "error": (
-                                "Invalid resource ID format. "
-                                "Expected: 'resource_group/policy_name'"
-                            )
-                        }
-
-                    policy = fd_client.policies.get(
-                        resource_group_name=resource_group,
-                        policy_name=policy_name,
-                    )
-
-                    # Convert to serializable dictionary
-                    policy_dict = {
-                        "id": policy.id,
-                        "name": policy.name,
-                        "policy_settings": (
-                            {
-                                "enabled_state": policy.policy_settings.enabled_state,
-                                "mode": policy.policy_settings.mode,
-                                "redirect_url": policy.policy_settings.redirect_url,
-                                "custom_block_response_status_code": (
-                                    policy.policy_settings.custom_block_response_status_code
-                                ),
-                            }
-                            if hasattr(policy, "policy_settings")
-                            else {}
-                        ),
-                        "custom_rules": (
-                            [
-                                {
-                                    "name": rule.name,
-                                    "action": rule.action,
-                                    "priority": rule.priority,
-                                }
-                                for rule in policy.custom_rules.rules
-                            ]
-                            if hasattr(policy, "custom_rules")
-                            else []
-                        ),
-                        "managed_rules": (
-                            [
-                                {
-                                    "rule_set_type": rule.rule_set_type,
-                                    "rule_set_version": rule.rule_set_version,
-                                }
-                                for rule in policy.managed_rules.rule_sets
-                            ]
-                            if hasattr(policy, "managed_rules")
-                            else []
-                        ),
-                    }
-
-                    return {"configuration": policy_dict}
-
-                else:
+                # Get Front Door configuration
+                if not resource_id or "/" not in resource_id:
                     return {
                         "error": (
-                            "Invalid resource ID. "
-                            "Must contain '/frontdoors/' or '/policies/'"
+                            "Resource ID required in format "
+                            "'subscription_id/resource_group/name'"
                         )
                     }
+
+                parts = resource_id.split("/")
+                if len(parts) < 3:
+                    return {"error": "Invalid resource ID format"}
+
+                subscription_id, resource_group, name = parts
+                frontdoor = frontdoor_client.front_doors.get(resource_group, name)
+                return {"configuration": frontdoor.as_dict()}
 
             elif query_type == "rules":
-                # Get WAF policy rules
+                # Get WAF policies
                 if not resource_id:
-                    return {"error": "Resource ID is required for rules queries"}
+                    return {"error": "Subscription ID required for rules query"}
 
-                # Parse resource ID
-                resource_parts = resource_id.split("/")
-                if len(resource_parts) >= 2:
-                    resource_group = resource_parts[0]
-                    policy_name = resource_parts[1]
-                else:
-                    return {
-                        "error": (
-                            "Invalid resource ID format. "
-                            "Expected: 'resource_group/policy_name'"
-                        )
-                    }
-
-                # Get the policy
-                policy = fd_client.policies.get(
-                    resource_group_name=resource_group,
-                    policy_name=policy_name,
+                policies = list(
+                    frontdoor_client.policies.list_by_subscription(resource_id)
                 )
-
-                rules_data = {
-                    "custom_rules": (
-                        [
-                            {
-                                "name": rule.name,
-                                "action": rule.action,
-                                "priority": rule.priority,
-                                "match_conditions": (
-                                    [
-                                        {
-                                            "match_variable": cond.match_variable,
-                                            "operator": cond.operator,
-                                            "negation_condition": (
-                                                cond.negation_condition
-                                            ),
-                                            "match_value": cond.match_value,
-                                        }
-                                        for cond in rule.match_conditions
-                                    ]
-                                    if hasattr(rule, "match_conditions")
-                                    else []
-                                ),
-                            }
-                            for rule in policy.custom_rules.rules
-                        ]
-                        if hasattr(policy, "custom_rules")
-                        and hasattr(policy.custom_rules, "rules")
-                        else []
-                    ),
-                    "managed_rules": (
-                        [
-                            {
-                                "rule_set_type": rule.rule_set_type,
-                                "rule_set_version": rule.rule_set_version,
-                                "exclusions": (
-                                    [
-                                        {
-                                            "match_variable": excl.match_variable,
-                                            "selector": excl.selector,
-                                            "selector_match_operator": (
-                                                excl.selector_match_operator
-                                            ),
-                                        }
-                                        for excl in rule.exclusions
-                                    ]
-                                    if hasattr(rule, "exclusions")
-                                    else []
-                                ),
-                            }
-                            for rule in policy.managed_rules.rule_sets
-                        ]
-                        if hasattr(policy, "managed_rules")
-                        and hasattr(policy.managed_rules, "rule_sets")
-                        else []
-                    ),
-                }
-
-                return {"rules": rules_data}
+                return {"rules": [policy.as_dict() for policy in policies]}
 
             else:
-                return {"error": f"Unsupported query type: {query_type}"}
+                return {"error": f"Unsupported query type for Azure: {query_type}"}
 
         except Exception as e:
-            logger.error(f"Error querying Azure WAF: {e}")
-            return {"error": f"Error querying Azure WAF: {str(e)}"}
+            logger.exception(f"Error querying Azure WAF API: {str(e)}")
+            return {"error": f"Error querying Azure WAF API: {str(e)}"}
+
+    def _parse_aws_resource_id(self, resource_id: str) -> tuple:
+        """Parse AWS resource ID to extract the ID and name.
+
+        Args:
+            resource_id: AWS resource ID or ARN
+
+        Returns:
+            Tuple containing (id, name) or (None, None) if invalid
+        """
+        # If resource_id is an ARN, extract the ID from it
+        if resource_id.startswith("arn:aws:wafv2:"):
+            parts = resource_id.split("/")
+            if len(parts) >= 2:
+                acl_id = parts[-1]
+                acl_name = parts[-2]
+                return acl_id, acl_name
+
+        # If resource_id is in format "name/id"
+        elif "/" in resource_id:
+            acl_name, acl_id = resource_id.split("/", 1)
+            return acl_id, acl_name
+
+        # If resource_id is just the ID (less common)
+        else:
+            return resource_id, resource_id
+
+        return None, None

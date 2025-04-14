@@ -1,0 +1,42 @@
+tool:
+  name: "waf_analysis_tool"
+  description: "Analyzes web application firewall configurations and protected assets from multiple providers including Imperva, Cloudflare, AWS, and Azure."
+  version: "1.0.0"
+
+configuration:
+  parameters:
+    enabled_providers:
+      type: "array"
+      description: "List of WAF providers to enable"
+      required: false
+      default: ["imperva", "cloudflare", "aws", "azure"]
+    request_timeout:
+      type: "number"
+      description: "Timeout in seconds for API requests"
+      required: false
+      default: 30
+    imperva_api_url:
+      type: "string"
+      description: "Base URL for Imperva API"
+      required: false
+      default: "https://api.imperva.com/api/v1"
+    cloudflare_api_url:
+      type: "string"
+      description: "Base URL for Cloudflare API"
+      required: false
+      default: "https://api.cloudflare.com/client/v4"
+    aws_region:
+      type: "string"
+      description: "AWS region for WAF API calls"
+      required: false
+      default: "us-east-1"
+    azure_api_version:
+      type: "string"
+      description: "Azure API version for WAF API calls"
+      required: false
+      default: "2020-11-01"
+  dependencies:
+    - "requests>=2.25.1"
+    - "python-dotenv>=0.19.0"
+    - "boto3>=1.24.0"
+    - "azure-mgmt-frontdoor>=1.0.0" 

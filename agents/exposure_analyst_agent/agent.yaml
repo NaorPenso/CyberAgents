@@ -21,6 +21,8 @@ tools:
   type: unknown
 - name: nmap_port_scanner
   type: unknown
+- name: waf_analysis_tool
+  type: unknown
 crewai_settings:
   allow_delegation: false
   verbose: true
