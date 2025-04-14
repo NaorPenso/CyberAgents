@@ -9,8 +9,9 @@ import os
 from typing import Any, ClassVar, Dict, List, Optional
 
 import yaml
-from common.interfaces.agent import AgentBase
+from ..base_agent import BaseAgent
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, ValidationError
+from crewai import Agent
 
 from tools.whois_lookup.whois_tool import WhoisTool
 
@@ -62,8 +63,8 @@ class SecurityContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class DomainWhoisAgentConfig(BaseModel):
-    """Configuration model for the DomainWhoisAgent."""
+class domain_whois_agentConfig(BaseModel):
+    """Configuration model for the domain_whois_agent."""
 
     # Required fields
     role: str
@@ -89,104 +90,113 @@ class DomainWhoisAgentConfig(BaseModel):
     # Prevent additional properties
     model_config = ConfigDict(extra="forbid")
 
-    @classmethod
-    def from_yaml(cls, file_path: str) -> "DomainWhoisAgentConfig":
-        """Load configuration from a YAML file.
 
-        Args:
-            file_path: Path to the YAML configuration file
-
-        Returns:
-            A validated DomainWhoisAgentConfig instance
-
-        Raises:
-            FileNotFoundError: If the configuration file doesn't exist
-            yaml.YAMLError: If the YAML file is malformed or can't be parsed
-            ValidationError: If the configuration doesn't match the required schema
-            ValueError: If the configuration has invalid values (post-load validation)
-        """
-        if not os.path.exists(file_path):
-            logger.error(f"Configuration file not found: {file_path}")
-            raise FileNotFoundError(f"Configuration file not found: {file_path}")
-
-        try:
-            # Load and parse the YAML file
-            with open(file_path, "r") as f:
-                config = yaml.safe_load(f)
-
-            if config is None:
-                logger.error(f"Empty or invalid YAML file: {file_path}")
-                raise ValueError(f"Empty or invalid YAML file: {file_path}")
-
-            # Create the config instance (Pydantic will validate schema compliance)
-            config_instance = cls(**config)
-
-            # Additional validation beyond Pydantic's automatic validation
-            if "whois_lookup" not in config_instance.tools:
-                logger.warning(
-                    f"Configuration missing required 'whois_lookup' tool in {file_path}"
-                )
-                raise ValueError("DomainWhoisAgent requires the 'whois_lookup' tool")
-
-            logger.info(
-                f"Successfully loaded and validated configuration from {file_path}"
-            )
-            return config_instance
-
-        except yaml.YAMLError as e:
-            logger.error(f"Error parsing YAML file {file_path}: {e}")
-            raise
-        except ValidationError as e:
-            logger.error(f"Configuration validation failed for {file_path}: {e}")
-            raise
-        except Exception as e:
-            logger.error(
-                f"Unexpected error loading configuration from {file_path}: {e}"
-            )
-            raise
-
-
-class DomainWhoisAgent(AgentBase):
+class domain_whois_agent(BaseAgent):
     """Agent for retrieving and parsing WHOIS data for a domain."""
 
     # Class-level attributes
-    NAME: ClassVar[str] = "DomainWhoisAgent"
+    NAME: ClassVar[str] = "domain_whois_agent"
     DESCRIPTION: ClassVar[str] = (
         "An agent that retrieves and structures WHOIS information for domains"
     )
 
+    config: domain_whois_agentConfig
+
     def __init__(self, config_path: Optional[str] = None):
-        """Initialize the DomainWhoisAgent.
+        """Initialize the domain_whois_agent.
 
         Args:
             config_path: Path to the configuration YAML file. If None, uses default.
         """
+        # Call super() first for consistency
+        super().__init__()
+
         if config_path is None:
             config_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "agent.yaml"
             )
 
-        # Load configuration
-        self.config = DomainWhoisAgentConfig.from_yaml(config_path)
+        # Load configuration using the internal _load_config method
+        loaded_config = self._load_config(config_path)
+        if loaded_config is None:
+            logger.error("Failed to load or validate agent configuration. Initialization aborted.")
+            # Optionally raise an error or handle it as needed
+            raise ValueError("Agent configuration failed to load or validate.")
+        self.config = loaded_config
 
         # Initialize tools
         self.tool_instances = {"whois_lookup": WhoisTool()}
+        agent_tools = [self.tool_instances[tool_name] for tool_name in self.config.tools]
 
-        # Initialize base agent properties
-        super().__init__(
+        # Explicitly create the crewai.Agent instance
+        self.agent = Agent(
             role=self.config.role,
             goal=self.config.goal,
             backstory=self.config.backstory,
-            tools=[self.tool_instances[tool_name] for tool_name in self.config.tools],
+            tools=agent_tools,
             allow_delegation=self.config.allow_delegation,
             verbose=self.config.verbose,
             memory=self.config.memory,
-            max_iterations=self.config.max_iterations,
+            max_iter=self.config.max_iterations,
             max_rpm=self.config.max_rpm,
             cache=self.config.cache,
+            # Assuming default LLM if not specified, or add llm_config handling here
+            # llm=create_llm() # Might need to import create_llm if needed
         )
 
-        logger.info(f"DomainWhoisAgent initialized with role: {self.config.role}")
+        # Assign attributes for potential direct access (optional but consistent)
+        self.agent_name = self.NAME
+        self.agent_role = self.config.role
+        self.agent_goal = self.config.goal
+        self.agent_backstory = self.config.backstory
+
+        logger.info(f"domain_whois_agent initialized with role: {self.config.role}")
+
+    def _load_config(self, config_path: str) -> Optional[domain_whois_agentConfig]:
+        """Load and validate the agent configuration from a YAML file.
+
+        Args:
+            config_path: Path to the configuration file
+
+        Returns:
+            Validated domain_whois_agentConfig object or None if loading/validation fails.
+        """
+        if not os.path.exists(config_path):
+            logger.error(f"Config file not found at {config_path}.")
+            return None
+
+        try:
+            with open(config_path, "r") as f:
+                raw_config = yaml.safe_load(f)
+            if raw_config is None:
+                logger.error(f"Config file {config_path} is empty or invalid YAML.")
+                return None
+
+            # Validate using Pydantic's model_validate
+            validated_config = domain_whois_agentConfig.model_validate(raw_config)
+
+            # Additional validation (already present in previous version, kept for robustness)
+            if "whois_lookup" not in validated_config.tools:
+                logger.warning(
+                    f"Configuration missing required 'whois_lookup' tool in {config_path}"
+                )
+                raise ValueError("domain_whois_agent requires the 'whois_lookup' tool")
+
+            logger.info(f"Successfully loaded and validated config from {config_path}")
+            return validated_config
+
+        except yaml.YAMLError as e:
+            logger.error(f"Error parsing YAML file {config_path}: {e}")
+            return None
+        except ValidationError as e:
+            logger.error(f"Configuration validation failed for {config_path}:\n{e}")
+            return None
+        except ValueError as e: # Catch specific ValueError from custom validation
+            logger.error(f"Configuration value error for {config_path}: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error loading config from {config_path}: {e}")
+            return None
 
     def get_task_result(self, task: Any) -> Dict:
         """Process the result of a task execution.

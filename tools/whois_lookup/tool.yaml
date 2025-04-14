@@ -1,0 +1,18 @@
+tool:
+  name: "whois_lookup"
+  description: "Lookup WHOIS information for a domain to retrieve registration details, ownership information, and nameserver configuration"
+  version: "1.0.0"
+
+configuration:
+  parameters:
+    domain:
+      type: "string"
+      description: "Domain name to perform WHOIS lookup on"
+      required: true
+    timeout:
+      type: "number"
+      description: "Timeout in seconds for the WHOIS query"
+      required: false
+      default: "30"
+  dependencies:
+    - "python-whois>=0.8.0" 
