@@ -11,7 +11,7 @@ from crewai import Agent
 
 from agents.base_agent import BaseAgent
 from tools.email_validation.email_validation_tool import EmailValidationTool
-from utils.llm_utils import create_llm
+from utils.llm_utils import create_central_llm
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class EmailSecurityAgent(BaseAgent):
             goal=self.agent_goal,
             backstory=self.agent_backstory,
             tools=self.agent_tools,
-            llm=create_llm(),
+            llm=create_central_llm(),
             verbose=True,
             allow_delegation=False,
         )

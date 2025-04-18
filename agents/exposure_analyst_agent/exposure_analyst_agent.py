@@ -13,7 +13,7 @@ from tools import (
     ShodanHostSearchTool,
     SubdomainFinderTool,
 )
-from utils.llm_utils import create_llm
+from utils.llm_utils import create_central_llm
 
 logger = logging.getLogger(__name__)
 
@@ -109,7 +109,7 @@ class ExposureAnalystAgent(BaseAgent):  # Inherit from BaseAgent
                 + " You provide a structured list and summary of discovered assets and their potential exposures."
             ),
             tools=available_tools,
-            llm=create_llm(),
+            llm=create_central_llm(),
             verbose=True,
             allow_delegation=False,
         )
