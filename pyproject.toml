@@ -60,6 +60,7 @@ azure-mgmt-frontdoor = "^1.2.0"
 azure-identity = "^1.21.0"
 langchain-community = {extras = ["cerebras"], version = "^0.3.21"}
 langchain-aws = "^0.2.21"
+langchain-cerebras = "^0.5.0"
 
 [tool.poetry.extras]
 test = ["pytest-picked"]
