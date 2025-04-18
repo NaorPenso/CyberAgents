@@ -9,7 +9,7 @@ from crewai import Agent
 from pydantic import BaseModel, Field, HttpUrl, ValidationError
 
 from agents.base_agent import BaseAgent
-from utils.llm_utils import create_llm
+from utils.llm_utils import create_central_llm
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,7 @@ class SecurityManagerAgent(BaseAgent):
             cache=self.config.cache,
             max_iter=self.config.max_iterations,
             max_rpm=self.config.max_rpm,
-            llm=create_llm(),
+            llm=create_central_llm(),
         )
 
         self.agent_name = "SecurityManagerAgent"

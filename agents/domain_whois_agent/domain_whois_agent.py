@@ -13,6 +13,7 @@ from crewai import Agent
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, ValidationError
 
 from tools.whois_lookup.whois_tool import WhoisTool
+from utils.llm_utils import create_central_llm
 
 from ..base_agent import BaseAgent
 
@@ -133,6 +134,9 @@ class domain_whois_agent(BaseAgent):
             self.tool_instances[tool_name] for tool_name in self.config.tools
         ]
 
+        # <<< ADDED: LLM instantiation >>>
+        central_llm = create_central_llm()
+
         # Explicitly create the crewai.Agent instance
         self.agent = Agent(
             role=self.config.role,
@@ -147,6 +151,8 @@ class domain_whois_agent(BaseAgent):
             cache=self.config.cache,
             # Assuming default LLM if not specified, or add llm_config handling here
             # llm=create_llm() # Might need to import create_llm if needed
+            # <<< ADDED: LLM assignment >>>
+            llm=central_llm,
         )
 
         # Assign attributes for potential direct access (optional but consistent)

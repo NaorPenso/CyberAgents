@@ -11,20 +11,23 @@ from typing import Dict, List, Optional
 
 import yaml
 from crewai import Agent
-from pydantic import (BaseModel, ConfigDict, Field, ValidationError,
-                      field_validator)
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from agents.base_agent import BaseAgent
-# Remove unused RateLimiter import
-# from utils.rate_limiter import RateLimiter
 
 # Import the actual tool
 from tools.semgrep_scanner.semgrep_scanner import SemgrepTool
+from utils.llm_utils import create_central_llm
+
+# Remove unused RateLimiter import
+# from utils.rate_limiter import RateLimiter
+
 
 logger = logging.getLogger(__name__)
 
 
 # --- Pydantic Models for agent.yaml Structure ---
+
 
 # Simplify the model to standard Agent fields loaded from YAML
 class AgentYamlModel(BaseModel):
@@ -37,10 +40,10 @@ class AgentYamlModel(BaseModel):
     # tools: List[str]
     allow_delegation: bool
     verbose: bool = True
-    memory: bool = False # Note: CrewAI Agent does not use this directly in constructor
+    memory: bool = False  # Note: CrewAI Agent does not use this directly in constructor
     max_iterations: int = 15
     max_rpm: Optional[int] = None
-    cache: bool = True # Note: CrewAI Agent does not use this directly in constructor
+    cache: bool = True  # Note: CrewAI Agent does not use this directly in constructor
 
     # Remove non-standard fields (metadata, custom config, inputs, outputs, etc.)
     # These should be defined elsewhere or are part of tool schemas
@@ -67,7 +70,7 @@ class AppSecEngineerAgent(BaseAgent):
 
     config: AgentYamlModel
     agent: Agent  # Add type hint for the CrewAI agent instance
-    semgrep_tool: SemgrepTool # Store the tool instance
+    semgrep_tool: SemgrepTool  # Store the tool instance
 
     def __init__(self):
         """
@@ -82,6 +85,9 @@ class AppSecEngineerAgent(BaseAgent):
         # potentially loading its own tool.yaml or using defaults.
         self.semgrep_tool = SemgrepTool()
 
+        # <<< ADDED: LLM instantiation >>>
+        central_llm = create_central_llm()
+
         # Initialize the CrewAI Agent
         self.agent = Agent(
             role=self.config.role,
@@ -94,8 +100,12 @@ class AppSecEngineerAgent(BaseAgent):
             # llm=self.get_llm() # Assuming a method to get the LLM
             max_iter=self.config.max_iterations,
             max_rpm=self.config.max_rpm,
+            # <<< ADDED: LLM assignment >>>
+            llm=central_llm,
         )
-        logger.info(f"AppSecEngineerAgent initialized with tool: {self.semgrep_tool.name}")
+        logger.info(
+            f"AppSecEngineerAgent initialized with tool: {self.semgrep_tool.name}"
+        )
 
     def _load_config(self) -> AgentYamlModel:
         """
@@ -127,9 +137,7 @@ class AppSecEngineerAgent(BaseAgent):
             logger.error(f"Validation Errors: {e}")
             raise
         except Exception as e:
-            logger.error(
-                f"An unexpected error occurred while loading config: {e}"
-            )
+            logger.error(f"An unexpected error occurred while loading config: {e}")
             raise
 
     # --- Remove analyze_code method --- (Handled by SemgrepTool)
@@ -145,6 +153,7 @@ class AppSecEngineerAgent(BaseAgent):
     # --- Remove _process_scan_results method --- (Handled by SemgrepTool)
 
     # --- Remove _forward_to_defect_review method --- (Placeholder removed)
+
 
 # Example of how to potentially use the agent (outside the class definition)
 # if __name__ == "__main__":
