@@ -142,30 +142,66 @@ if ! command_exists poetry; then
     export PATH="$HOME/.local/bin:$PATH"
     echo "Poetry installed. You might need to restart your shell or run 'source \$HOME/.poetry/env' for the change to take effect permanently."
     # Verify
-     if ! command_exists poetry; then
+    if ! command_exists poetry; then
         echo "ERROR: Poetry installation failed or it's not in PATH. Please check the output above."
         exit 1
-     fi
+    fi
 else
     echo "Poetry found."
 fi
 poetry --version
 
-# --- Ollama Check & Installation ---
-echo "\n--- Checking/Installing Ollama --- "
-if ! command_exists ollama; then
-    echo "Ollama not found. Installing Ollama..."
-    curl -fsSL https://ollama.com/install.sh | sh
-    echo "Ollama installed. It might run as a background service automatically."
-    # Verify
-    if ! command_exists ollama; then
-         echo "ERROR: Ollama installation failed. Please check the output above."
-         exit 1
-    fi
+# Check Poetry version and install shell plugin if needed for Poetry 2.0.0+
+POETRY_VERSION=$(poetry --version | grep -o '[0-9]\+\.[0-9]\+\.[0-9]\+')
+POETRY_MAJOR=$(echo $POETRY_VERSION | cut -d. -f1)
+
+if [[ "$POETRY_MAJOR" -ge "2" ]]; then
+    echo "Poetry 2.0.0+ detected. Installing poetry shell plugin..."
+    poetry self add poetry-plugin-shell
 else
-    echo "Ollama found."
+    echo "Poetry version is less than 2.0.0. Shell plugin not required."
 fi
-ollama --version
+
+# --- Ollama Setup (Conditional) ---
+# Ollama installation and setup will only run if the environment variable
+# INSTALL_OLLAMA is set to "true".
+# Example: export INSTALL_OLLAMA=true && ./setup.sh
+if [[ "${INSTALL_OLLAMA}" == "true" ]]; then
+    echo "--- Checking/Installing Ollama & Pulling Model --- "
+
+    # Check/Install Ollama
+    if ! command_exists ollama; then
+        echo "Ollama not found. Installing Ollama..."
+        curl -fsSL https://ollama.com/install.sh | sh
+        echo "Ollama installed. It might run as a background service automatically."
+        # Verify installation
+        if ! command_exists ollama; then
+             echo "ERROR: Ollama installation failed. Please check the output above."
+             exit 1
+        fi
+    else
+        echo "Ollama found."
+    fi
+    ollama --version
+
+    # Pull Ollama Model
+    echo "Pulling default Ollama model (phi:latest). This might take a while..."
+    # Check if Ollama server is running, start if not (best effort)
+    if ! pgrep -x ollama > /dev/null; then
+        echo "Ollama server not detected, attempting to start it in the background..."
+        # Check if user has permissions to write log here, otherwise might fail silently
+        nohup ollama serve > ollama_setup.log 2>&1 &
+        sleep 5 # Give it a moment
+        if ! pgrep -x ollama > /dev/null; then
+            echo "Warning: Failed to automatically start Ollama server. Please start it manually ('ollama serve'). Model pull might fail."
+        fi
+    fi
+    # Attempt to pull the model
+    ollama pull phi:latest || echo "Warning: Failed to pull Ollama model. Ensure Ollama server is running, INSTALL_OLLAMA is true, and network is available."
+else
+    echo "--- Skipping Ollama Setup ---"
+    echo "Set INSTALL_OLLAMA=true environment variable to install Ollama and pull the model."
+fi
 
 # --- Project Setup ---
 echo "\n--- Setting up Project Dependencies --- "
@@ -179,22 +215,6 @@ fi
 echo "Installing Python dependencies using Poetry..."
 poetry install --no-interaction --extras test # Install main + test dependencies
 
-echo "\n--- Setting up Ollama Model --- "
-echo "Pulling default Ollama model (phi:latest). This might take a while..."
-# Check if Ollama server is running, start if not (best effort)
-if ! pgrep -x ollama > /dev/null; then
-    echo "Ollama server not detected, attempting to start it in the background..."
-    # Check if user has permissions to write log here, otherwise might fail silently
-    nohup ollama serve > ollama_setup.log 2>&1 &
-    sleep 5 # Give it a moment
-    if ! pgrep -x ollama > /dev/null; then
-        echo "Warning: Failed to automatically start Ollama server. Please start it manually ('ollama serve'). Model pull might fail."
-        # Consider removing the model pull attempt if server start failed
-        # exit 1 # Or exit if Ollama server is critical for subsequent steps
-    fi
-fi
-# Attempt to pull even if server start was iffy, it might connect to an existing one
-ollama pull phi:latest || echo "Warning: Failed to pull Ollama model. Ensure Ollama server is running and network is available."
 
 
 # --- Environment File Setup ---
