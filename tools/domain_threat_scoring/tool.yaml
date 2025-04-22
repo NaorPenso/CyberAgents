@@ -1,0 +1,19 @@
+# Configuration for the Domain Threat Score Tool
+# Conforms to schemas/tool_schema.yaml
+
+tool:
+  # Name MUST match the 'name' attribute in the DomainThreatScoreTool class
+  name: "threat_intelligence"
+  description: "Analyze domain for security threats using VirusTotal and derive a threat score."
+  version: "1.0.0" # Update if tool version changes
+
+configuration:
+  parameters:
+    # This tool requires the VIRUSTOTAL_API_KEY environment variable for authentication.
+    # No parameters are configured via this YAML file.
+    _note: "Requires VIRUSTOTAL_API_KEY environment variable. No configurable YAML parameters."
+
+  dependencies:
+    # List required Python packages
+    - "vt-py" # vt.Client is used
+    # Add utils dependency? Assumes utils/rate_limiter.py

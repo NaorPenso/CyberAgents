@@ -158,3 +158,6 @@ PR_DESCRIPTION*.md
 
 # Cursor rules - these should never be committed to the remote repo
 cursor_rules/
+
+# Snapshot files
+*.snapshot

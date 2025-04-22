@@ -5,13 +5,13 @@ This agent uses DNS lookup tools to gather information about domain names.
 """
 
 import logging
+from typing import Any
 
 # Import necessary components
 from crewai import Agent
 
 from agents.base_agent import BaseAgent
 from tools.dns_lookup.dns_tool import DNSTool
-from utils.llm_utils import create_llm
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,9 @@ class DNSAnalyzerAgent(BaseAgent):
     Uses the DNSLookupTool to query various DNS record types.
     """
 
-    def __init__(self):
-        """Initialize the DNS Analyzer Agent."""
-        super().__init__()
+    def __init__(self, llm: Any):
+        """Initialize the DNS Analyzer Agent with the passed LLM."""
+        super().__init__(llm)
         self.agent_name = "DNSAnalyzerAgent"
         self.agent_role = "DNS Specialist"
         self.agent_goal = "Perform DNS lookups and analyze domain records."
@@ -35,13 +35,17 @@ class DNSAnalyzerAgent(BaseAgent):
         self.agent_tools = [DNSTool()]
         logger.info("DNS Analyzer Agent initialized")
 
-        # Initialize the crewai Agent
+        # Initialize the crewai Agent using PASSED LLM
         self.agent = Agent(
             role=self.agent_role,
             goal=self.agent_goal,
             backstory=self.agent_backstory,
             tools=self.agent_tools,
-            llm=create_llm(),
+            llm=self.llm,
             verbose=True,
             allow_delegation=False,
         )
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent

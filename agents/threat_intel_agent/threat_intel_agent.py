@@ -6,13 +6,13 @@ malicious activities, resolutions, and related entities associated with a target
 
 import logging
 import os
+from typing import Any
 
 # Restore crewai import
 from crewai import Agent
 
 from agents.base_agent import BaseAgent
 from tools.threat_intel_analyzer.threat_tool import ThreatTool
-from utils.llm_utils import create_llm
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +23,9 @@ class ThreatIntelAgent(BaseAgent):
     Uses the ThreatTool to query external sources like VirusTotal.
     """
 
-    def __init__(self):
-        """Initialize the Threat Intelligence Agent."""
-        super().__init__()
+    def __init__(self, llm: Any):
+        """Initialize the Threat Intelligence Agent with the passed LLM."""
+        super().__init__(llm)
         self.agent_name = "ThreatIntelAgent"
         self.agent_role = "Threat Intelligence Analyst"
         self.agent_goal = (
@@ -50,13 +50,17 @@ class ThreatIntelAgent(BaseAgent):
                 "VIRUSTOTAL_API_KEY environment variable is not set and is required for ThreatIntelAgent"
             )
 
-        # Restore Agent initialization
+        # Restore Agent initialization using PASSED LLM
         self.agent = Agent(
             role="Threat Intelligence Analyst",
             goal="Analyze security threats associated with a specific domain using external intelligence sources.",
             backstory="A seasoned security analyst specializing in threat intelligence. You leverage external databases like VirusTotal to assess domain reputation, identify malicious associations, and provide a structured threat score and summary.",
             tools=[ThreatTool()],
-            llm=create_llm(),
+            llm=self.llm,
             verbose=True,
             allow_delegation=False,
         )
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent

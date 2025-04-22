@@ -1,0 +1,19 @@
+# Configuration for the Shodan Host Search Tool
+# Conforms to schemas/tool_schema.yaml
+
+tool:
+  name: "shodan_host_search"
+  description: "Searches Shodan for hosts, open ports, and services associated with a given domain. Requires the SHODAN_API_KEY environment variable to be set."
+  version: "1.0.0"
+
+configuration:
+  parameters:
+    # This tool primarily takes its input ('domain') via the agent's task execution
+    # and requires the SHODAN_API_KEY environment variable for authentication.
+    # No parameters are configured via this YAML file.
+    _note: "Requires SHODAN_API_KEY environment variable. No configurable YAML parameters."
+
+  dependencies:
+    # List required Python packages
+    - "shodan"
+    # Add other dependencies if identified

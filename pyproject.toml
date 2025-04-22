@@ -30,8 +30,8 @@ python-whois = "0.9.5"
 dnspython = "^2.4.2"
 requests = "^2.31.0"
 vt-py = "0.20.0"
-langchain = "^0.1.0"
-langchain-openai = "^0.1.0"
+langchain = "^0.3.23"
+langchain-openai = "^0.3.14"
 openai = "^1.6.1"
 opentelemetry-api = "1.31.1"
 opentelemetry-sdk = "1.31.1"
@@ -58,6 +58,9 @@ opentelemetry-util-http = "0.52b1"
 boto3 = "^1.37.33"
 azure-mgmt-frontdoor = "^1.2.0"
 azure-identity = "^1.21.0"
+langchain-community = {extras = ["cerebras"], version = "^0.3.21"}
+langchain-aws = "^0.2.21"
+langchain-cerebras = "^0.5.0"
 
 [tool.poetry.extras]
 test = ["pytest-picked"]
@@ -104,4 +107,7 @@ exclude = [
     "*.egg-info",
 ]
 max-line-length = 88
-extend-ignore = ["E203"] # Ignore whitespace before ':' (compatible with black)
+ignore = ["E203"]
+per-file-ignores = [
+    "main.py: B950",
+]

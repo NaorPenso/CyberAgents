@@ -18,7 +18,7 @@ import yaml
 from crewai import Agent, Crew, Task
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from agents.base_agent import BaseAgen
+from agents.base_agent import BaseAgent
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +30,9 @@ class LLMConfig(BaseModel):
     temperature: float = Field(
         default=0.7, description="Temperature setting for the LLM", ge=0, le=2.0
     )
-    api_key: Optional[str] = Field(default=None, description="API key for the LLM service")
+    api_key: Optional[str] = Field(
+        default=None, description="API key for the LLM service"
+    )
     base_url: Optional[str] = Field(
         default=None, description="Base URL for the LLM service"
     )
@@ -49,7 +51,8 @@ class SecurityContext(BaseModel):
     )
     timeout: int = Field(default=30, description="Timeout in seconds for operations")
     allow_internet_access: bool = Field(
-        default=False, description="Whether the agent can make external network requests"
+        default=False,
+        description="Whether the agent can make external network requests",
     )
     logging_level: str = Field(
         default="INFO",
@@ -93,27 +96,33 @@ class DefectReviewAgentConfig(BaseModel):
     max_rpm: int = Field(
         default=60, description="Maximum requests per minute for the agent"
     )
-    cache: bool = Field(default=True, description="Enable/disable caching for the agent")
+    cache: bool = Field(
+        default=True, description="Enable/disable caching for the agent"
+    )
     security_context: Optional[SecurityContext] = Field(
         default=None, description="Security context and permissions"
     )
 
     # Custom configuration options for this agen
     include_code_examples: bool = Field(
-        default=True, description="Whether to include code examples in remediation suggestions"
+        default=True,
+        description="Whether to include code examples in remediation suggestions",
     )
     max_suggestions_per_finding: int = Field(
         default=3, description="Maximum number of remediation suggestions per finding"
     )
     prioritize_critical: bool = Field(
-        default=True, description="Whether to prioritize critical and high severity findings"
+        default=True,
+        description="Whether to prioritize critical and high severity findings",
     )
     # New option to enable collaborative analysis
     enable_collaborative_analysis: bool = Field(
-        default=True, description="Whether to delegate analysis tasks to specialist agents"
+        default=True,
+        description="Whether to delegate analysis tasks to specialist agents",
     )
     collaborative_agents: List[str] = Field(
-        default_factory=list, description="List of specialist agents for collaborative analysis"
+        default_factory=list,
+        description="List of specialist agents for collaborative analysis",
     )
 
     model_config = ConfigDict(extra="forbid")
@@ -133,7 +142,9 @@ class DefectReviewAgentConfig(BaseModel):
         if "llm_config" in config_dict and config_dict["llm_config"]:
             config_dict["llm_config"] = LLMConfig(**config_dict["llm_config"])
         if "security_context" in config_dict and config_dict["security_context"]:
-            config_dict["security_context"] = SecurityContext(**config_dict["security_context"])
+            config_dict["security_context"] = SecurityContext(
+                **config_dict["security_context"]
+            )
 
         return cls(**config_dict)
 
@@ -164,20 +175,32 @@ class DefectReviewAgent(BaseAgent):
 
     # Complex vulnerabilities that may require specialist agent suppor
     COMPLEX_VULNERABILITY_TYPES = [
-        "CSRF", "XSS", "SQL Injection", "Command Injection",
-        "Deserialization", "XXE", "SSRF", "Path Traversal",
-        "Authentication Bypass", "Authorization Bypass", "Access Control",
-        "Cryptographic Issues", "Secure Configuration"
+        "CSRF",
+        "XSS",
+        "SQL Injection",
+        "Command Injection",
+        "Deserialization",
+        "XXE",
+        "SSRF",
+        "Path Traversal",
+        "Authentication Bypass",
+        "Authorization Bypass",
+        "Access Control",
+        "Cryptographic Issues",
+        "Secure Configuration",
     ]
 
-    def __init__(self, **kwargs):
-        """Initialize the Defect Review Agent."""
+    def __init__(self, llm: Any, **kwargs):
+        """Initialize the Defect Review Agent with the passed LLM."""
         try:
+            # Call BaseAgent init with the passed LLM
+            super().__init__(llm)
+
             # Initialize crew if provided
-            self.crew = kwargs.get('crew', None)
+            self.crew = kwargs.get("crew", None)
 
             # Check for config override
-            config_override = kwargs.pop('config', {})
+            config_override = kwargs.pop("config", {})
 
             config_path = os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "agent.yaml"
@@ -194,69 +217,63 @@ class DefectReviewAgent(BaseAgent):
                 self.config = DefectReviewAgentConfig.from_dict(config_dict)
 
                 # Set up the agent with the configuration
-                kwargs["role"] = self.config.role
-                kwargs["goal"] = self.config.goal
-                kwargs["backstory"] = self.config.backstory
-                kwargs["verbose"] = self.config.verbose
-                kwargs["allow_delegation"] = self.config.allow_delegation
+                agent_kwargs = {}
+                agent_kwargs["role"] = self.config.role
+                agent_kwargs["goal"] = self.config.goal
+                agent_kwargs["backstory"] = self.config.backstory
+                agent_kwargs["verbose"] = self.config.verbose
+                agent_kwargs["allow_delegation"] = self.config.allow_delegation
+                agent_kwargs["llm"] = self.llm
 
                 if self.config.tools:
-                    kwargs["tools"] = self.config.tools
+                    # TODO: Instantiate tools based on names if needed
+                    # For now, assuming tools are passed differently or handled by CrewAI
+                    # agent_kwargs["tools"] = self.config.tools
+                    pass
 
                 # Optional configurations
                 if self.config.memory:
-                    kwargs["memory"] = True
-
-                if self.config.llm_config:
-                    kwargs["llm_config"] = {
-                        "config_list": [{"model": self.config.llm_config.model}],
-                        "temperature": self.config.llm_config.temperature,
-                        "cache": self.config.cache,
-                    }
-
-                    # Add API key and base URL if provided
-                    if self.config.llm_config.api_key:
-                        kwargs["llm_config"]["config_list"][0]["api_key"] = self.config.llm_config.api_key
-
-                    if self.config.llm_config.base_url:
-                        kwargs["llm_config"]["config_list"][0]["base_url"] = self.config.llm_config.base_url
+                    agent_kwargs["memory"] = True
 
                 # Process custom configuration options
                 self.include_code_examples = self.config.include_code_examples
                 self.max_suggestions = self.config.max_suggestions_per_finding
                 self.prioritize_critical = self.config.prioritize_critical
-                self.enable_collaborative_analysis = self.config.enable_collaborative_analysis
+                self.enable_collaborative_analysis = (
+                    self.config.enable_collaborative_analysis
+                )
                 self.collaborative_agents = self.config.collaborative_agents
 
-            # Initialize the base agen
-            super().__init__()
-
             # Store the kwargs for use by child classes
-            self.agent_kwargs = kwargs
+            self.agent_kwargs = agent_kwargs
 
             # Create the crewai.Agent instance - THIS IS THE CRITICAL MISSING PART
-            from utils.llm_utils import create_llm
+            from utils.llm_utils import create_central_llm
 
             # Get tools needed by the agen
             agent_tools = self.get_tools()
 
             # Create the CrewAI Agent instance
             self.agent = Agent(
-                role=kwargs.get("role", self.config.role),
-                goal=kwargs.get("goal", self.config.goal),
-                backstory=kwargs.get("backstory", self.config.backstory),
+                role=agent_kwargs.get("role", self.config.role),
+                goal=agent_kwargs.get("goal", self.config.goal),
+                backstory=agent_kwargs.get("backstory", self.config.backstory),
                 tools=agent_tools,
-                verbose=kwargs.get("verbose", self.config.verbose),
-                allow_delegation=kwargs.get("allow_delegation", self.config.allow_delegation),
-                memory=kwargs.get("memory", self.config.memory),
-                max_iter=kwargs.get("max_iterations", self.config.max_iterations),
-                max_rpm=kwargs.get("max_rpm", self.config.max_rpm),
-                cache=kwargs.get("cache", self.config.cache),
-                llm=create_llm()
+                verbose=agent_kwargs.get("verbose", self.config.verbose),
+                allow_delegation=agent_kwargs.get(
+                    "allow_delegation", self.config.allow_delegation
+                ),
+                memory=agent_kwargs.get("memory", self.config.memory),
+                max_iter=agent_kwargs.get("max_iterations", self.config.max_iterations),
+                max_rpm=agent_kwargs.get("max_rpm", self.config.max_rpm),
+                cache=agent_kwargs.get("cache", self.config.cache),
+                llm=self.llm,
             )
 
             # Log success for debugging
-            logger.info("Successfully created CrewAI Agent instance for DefectReviewAgent")
+            logger.info(
+                "Successfully created CrewAI Agent instance for DefectReviewAgent"
+            )
 
             # Assign attributes for potential direct access
             self.agent_name = "DefectReviewAgent"
@@ -269,7 +286,17 @@ class DefectReviewAgent(BaseAgent):
             logger.error(traceback.format_exc())
             raise
 
-    def _perform_collaborative_analysis(self, finding: Dict[str, Any]) -> Dict[str, Any]:
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        # Ensure the agent has been initialized before returning
+        if not hasattr(self, "agent") or self.agent is None:
+            logger.error("Attempted to get agent before it was initialized.")
+            raise AttributeError("Agent has not been initialized properly.")
+        return self.agent
+
+    def _perform_collaborative_analysis(
+        self, finding: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Delegate analysis of complex vulnerabilities to specialist agents.
 
@@ -280,17 +307,23 @@ class DefectReviewAgent(BaseAgent):
             Dict containing the enhanced analysis from specialist agents
         """
         if not self.enable_collaborative_analysis or not self.collaborative_agents:
-            logger.info("Collaborative analysis is disabled or no specialist agents configured")
+            logger.info(
+                "Collaborative analysis is disabled or no specialist agents configured"
+            )
             return {"specialist_analysis": None, "recommendations": []}
 
         vulnerability_type = finding.get("type", "").upper()
         severity = finding.get("severity", "").upper()
 
         # Only use specialist agents for complex or high-severity vulnerabilities
-        if (vulnerability_type in self.COMPLEX_VULNERABILITY_TYPES or
-                severity in ["CRITICAL", "HIGH"]):
+        if vulnerability_type in self.COMPLEX_VULNERABILITY_TYPES or severity in [
+            "CRITICAL",
+            "HIGH",
+        ]:
 
-            logger.info(f"Delegating analysis of {vulnerability_type} ({severity}) to specialist agents")
+            logger.info(
+                f"Delegating analysis of {vulnerability_type} ({severity}) to specialist agents"
+            )
 
             # This is where we would delegate to other agents in the crew
             # For now, we'll just return a placeholder
@@ -300,9 +333,9 @@ class DefectReviewAgent(BaseAgent):
                 "specialist_analysis": {
                     "delegated_to": self.collaborative_agents,
                     "vulnerability_type": vulnerability_type,
-                    "status": "analysis_requested"
+                    "status": "analysis_requested",
                 },
-                "recommendations": []
+                "recommendations": [],
             }
 
         return {"specialist_analysis": None, "recommendations": []}
@@ -320,10 +353,14 @@ class DefectReviewAgent(BaseAgent):
         logger.info(f"Analyzing vulnerability: {finding.get('title', 'Untitled')}")
 
         # Determine if this vulnerability requires specialist analysis
-        requires_specialist = (
-            finding.get("type", "").upper() in self.COMPLEX_VULNERABILITY_TYPES or
-            finding.get("severity", "").upper() in ["CRITICAL", "HIGH"]
-        )
+        requires_specialist = finding.get(
+            "type", ""
+        ).upper() in self.COMPLEX_VULNERABILITY_TYPES or finding.get(
+            "severity", ""
+        ).upper() in [
+            "CRITICAL",
+            "HIGH",
+        ]
 
         if requires_specialist and self.enable_collaborative_analysis:
             logger.info("Using collaborative analysis workflow")
@@ -367,14 +404,14 @@ class DefectReviewAgent(BaseAgent):
         risk_score = self._calculate_risk_score(
             exposure_analysis["exposure"],
             exposure_analysis["threats"],
-            exposure_analysis["architecture"]
+            exposure_analysis["architecture"],
         )
 
         return {
             "exposure_analysis": exposure_analysis,
             "evidence": evidence,
             "remediation_suggestions": remediation,
-            "risk_score": risk_score
+            "risk_score": risk_score,
         }
 
     def _analyze_exposure_and_threats(self, finding: Dict[str, Any]) -> Dict[str, Any]:
@@ -387,7 +424,9 @@ class DefectReviewAgent(BaseAgent):
         Returns:
             Dict containing exposure and threat analysis results
         """
-        logger.info(f"Analyzing exposure and threats for {finding.get('rule_id', 'unknown')}")
+        logger.info(
+            f"Analyzing exposure and threats for {finding.get('rule_id', 'unknown')}"
+        )
 
         # Extract vulnerability type and severity
         vuln_type = finding.get("rule_id", "").lower()
@@ -399,14 +438,18 @@ class DefectReviewAgent(BaseAgent):
             "attack_vector": "unknown",
             "authentication_required": True,
             "potentially_exposed_data": [],
-            "potential_impact": "unknown"
+            "potential_impact": "unknown",
         }
 
         # Enhance exposure details based on vulnerability type
         if "sql-injection" in vuln_type:
             exposure["attack_vector"] = "web"
             exposure["authentication_required"] = False
-            exposure["potentially_exposed_data"] = ["database records", "customer data", "credentials"]
+            exposure["potentially_exposed_data"] = [
+                "database records",
+                "customer data",
+                "credentials",
+            ]
             exposure["potential_impact"] = "data breach, data manipulation"
         elif "xss" in vuln_type:
             exposure["attack_vector"] = "web"
@@ -421,7 +464,10 @@ class DefectReviewAgent(BaseAgent):
         elif "path-traversal" in vuln_type or "lfi" in vuln_type:
             exposure["attack_vector"] = "web"
             exposure["authentication_required"] = False
-            exposure["potentially_exposed_data"] = ["system files", "configuration files"]
+            exposure["potentially_exposed_data"] = [
+                "system files",
+                "configuration files",
+            ]
             exposure["potential_impact"] = "information disclosure, code execution"
         elif "command-injection" in vuln_type or "code-injection" in vuln_type:
             exposure["attack_vector"] = "web"
@@ -434,7 +480,7 @@ class DefectReviewAgent(BaseAgent):
             "threat_level": severity,
             "known_exploits": severity in ["critical", "high"],
             "attack_complexity": "medium",
-            "exploit_maturity": "unknown"
+            "exploit_maturity": "unknown",
         }
 
         # Adjust threat assessment based on severity
@@ -454,7 +500,7 @@ class DefectReviewAgent(BaseAgent):
         return {
             "exposure": exposure,
             "threats": threats,
-            "architecture": {"exploitation_difficulty": threats["attack_complexity"]}
+            "architecture": {"exploitation_difficulty": threats["attack_complexity"]},
         }
 
     def _collect_evidence(self, finding: Dict[str, Any]) -> Dict[str, Any]:
@@ -480,18 +526,14 @@ class DefectReviewAgent(BaseAgent):
         evidence = {
             "evidence_id": f"EV-{rule_id}-{line}",
             "timestamp": None,  # Would be set to current time in production
-            "source_details": {
-                "file": path,
-                "line": line,
-                "code_snippet": code
-            },
+            "source_details": {"file": path, "line": line, "code_snippet": code},
             "vulnerability_details": {
                 "type": rule_id,
                 "description": message,
-                "owasp_category": self._map_to_owasp_category(rule_id)
+                "owasp_category": self._map_to_owasp_category(rule_id),
             },
             "confirmation_status": "needs_verification",
-            "additional_context": []
+            "additional_context": [],
         }
 
         return evidence
@@ -509,7 +551,7 @@ class DefectReviewAgent(BaseAgent):
             "insecure-cookie": "A2:2021-Cryptographic Failures",
             "weak-encryption": "A2:2021-Cryptographic Failures",
             "insecure-auth": "A7:2021-Identification and Authentication Failures",
-            "sensitive-data-exposure": "A2:2021-Cryptographic Failures"
+            "sensitive-data-exposure": "A2:2021-Cryptographic Failures",
         }
 
         # Try to match the rule ID with known vulnerability types
@@ -519,7 +561,9 @@ class DefectReviewAgent(BaseAgent):
 
         return "Unknown"
 
-    def _generate_remediation_plan(self, finding: Dict[str, Any], evidence: Dict[str, Any]) -> List[Dict[str, Any]]:
+    def _generate_remediation_plan(
+        self, finding: Dict[str, Any], evidence: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """
         Generate remediation suggestions for the vulnerability.
 
@@ -530,7 +574,9 @@ class DefectReviewAgent(BaseAgent):
         Returns:
             List of dictionaries containing remediation suggestions
         """
-        logger.info(f"Generating remediation plan for {finding.get('rule_id', 'unknown')}")
+        logger.info(
+            f"Generating remediation plan for {finding.get('rule_id', 'unknown')}"
+        )
 
         vuln_type = finding.get("rule_id", "").lower()
         code = finding.get("code", "")
@@ -539,23 +585,23 @@ class DefectReviewAgent(BaseAgent):
         # Determine language from file extension
         language = "unknown"
         if path:
-            extension = path.split('.')[-1].lower() if '.' in path else ''
-            if extension in ['py', 'python']:
-                language = 'python'
-            elif extension in ['js', 'jsx', 'ts', 'tsx']:
-                language = 'javascript'
-            elif extension in ['java']:
-                language = 'java'
-            elif extension in ['php']:
-                language = 'php'
-            elif extension in ['rb']:
-                language = 'ruby'
-            elif extension in ['go']:
-                language = 'go'
-            elif extension in ['cs']:
-                language = 'csharp'
-            elif extension in ['c', 'cpp', 'cc', 'h', 'hpp']:
-                language = 'c++'
+            extension = path.split(".")[-1].lower() if "." in path else ""
+            if extension in ["py", "python"]:
+                language = "python"
+            elif extension in ["js", "jsx", "ts", "tsx"]:
+                language = "javascript"
+            elif extension in ["java"]:
+                language = "java"
+            elif extension in ["php"]:
+                language = "php"
+            elif extension in ["rb"]:
+                language = "ruby"
+            elif extension in ["go"]:
+                language = "go"
+            elif extension in ["cs"]:
+                language = "csharp"
+            elif extension in ["c", "cpp", "cc", "h", "hpp"]:
+                language = "c++"
 
         # Base structure for remediation
         base_remediation = {
@@ -566,7 +612,7 @@ class DefectReviewAgent(BaseAgent):
             "message": finding.get("message", ""),
             "language": language,
             "recommendation": "",
-            "code_example": None
+            "code_example": None,
         }
 
         # Generate language-specific remediation suggestions
@@ -575,8 +621,12 @@ class DefectReviewAgent(BaseAgent):
         # SQL Injection
         if "sql-injection" in vuln_type:
             if language == "python":
-                base_remediation["recommendation"] = "Use parameterized queries with placeholders instead of string concatenation"
-                base_remediation["code_example"] = """
+                base_remediation["recommendation"] = (
+                    "Use parameterized queries with placeholders instead of string concatenation"
+                )
+                base_remediation[
+                    "code_example"
+                ] = """
 # VULNERABLE:
 query = "SELECT * FROM users WHERE id = " + user_inpu
 
@@ -585,8 +635,12 @@ query = "SELECT * FROM users WHERE id = %s"
 cursor.execute(query, (user_input,))
 """
             elif language == "javascript":
-                base_remediation["recommendation"] = "Use parameterized queries with prepared statements"
-                base_remediation["code_example"] = """
+                base_remediation["recommendation"] = (
+                    "Use parameterized queries with prepared statements"
+                )
+                base_remediation[
+                    "code_example"
+                ] = """
 // VULNERABLE:
 const query = "SELECT * FROM users WHERE id = " + userId;
 
@@ -602,9 +656,13 @@ connection.query(query, [userId], function(err, results) {
             if not self.config.max_suggestions_per_finding == 1:
                 # Add second suggestion
                 second_suggestion = base_remediation.copy()
-                second_suggestion["recommendation"] = "Implement an ORM (Object-Relational Mapping) library to handle database queries securely"
+                second_suggestion["recommendation"] = (
+                    "Implement an ORM (Object-Relational Mapping) library to handle database queries securely"
+                )
                 if language == "python":
-                    second_suggestion["code_example"] = """
+                    second_suggestion[
+                        "code_example"
+                    ] = """
 # Using SQLAlchemy ORM:
 from sqlalchemy.orm import Session
 from models import User
@@ -613,7 +671,9 @@ def get_user(session: Session, user_id: int):
     return session.query(User).filter(User.id == user_id).first()
 """
                 elif language == "javascript":
-                    second_suggestion["code_example"] = """
+                    second_suggestion[
+                        "code_example"
+                    ] = """
 // Using Sequelize ORM:
 const user = await User.findByPk(userId);
 """
@@ -621,9 +681,13 @@ const user = await User.findByPk(userId);
 
         # XSS
         elif "xss" in vuln_type:
-            base_remediation["recommendation"] = "Sanitize user input before rendering it in HTML context"
+            base_remediation["recommendation"] = (
+                "Sanitize user input before rendering it in HTML context"
+            )
             if language == "python":
-                base_remediation["code_example"] = """
+                base_remediation[
+                    "code_example"
+                ] = """
 # VULNERABLE:
 @app.route('/profile')
 def profile():
@@ -637,7 +701,9 @@ def profile():
     return render_template('profile.html', name=escape(request.args.get('name')))
 """
             elif language == "javascript":
-                base_remediation["code_example"] = """
+                base_remediation[
+                    "code_example"
+                ] = """
 // VULNERABLE:
 document.getElementById('profile').innerHTML = '<h1>' + userName + '</h1>';
 
@@ -651,8 +717,12 @@ document.getElementById('profile').innerHTML = '<h1>' + sanitize(userName) + '</
             if not self.config.max_suggestions_per_finding == 1:
                 # Add second suggestion
                 second_suggestion = base_remediation.copy()
-                second_suggestion["recommendation"] = "Use a Content Security Policy (CSP) header to prevent execution of inline scripts"
-                second_suggestion["code_example"] = """
+                second_suggestion["recommendation"] = (
+                    "Use a Content Security Policy (CSP) header to prevent execution of inline scripts"
+                )
+                second_suggestion[
+                    "code_example"
+                ] = """
 # Add this header to your HTTP responses:
 Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-cdn.com
 """
@@ -660,15 +730,21 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
 
         # If no specific remediation is available, add a generic one
         if not remediation_suggestions:
-            base_remediation["recommendation"] = "Review this vulnerability and implement proper input validation and output encoding"
+            base_remediation["recommendation"] = (
+                "Review this vulnerability and implement proper input validation and output encoding"
+            )
             base_remediation["code_example"] = None
             remediation_suggestions.append(base_remediation.copy())
 
         # Limit the number of suggestions based on configuration
-        return remediation_suggestions[:self.max_suggestions]
+        return remediation_suggestions[: self.max_suggestions]
 
-    def _calculate_risk_score(self, exposure_result: Dict[str, Any], threat_result: Dict[str, Any],
-                              architecture_result: Dict[str, Any]) -> float:
+    def _calculate_risk_score(
+        self,
+        exposure_result: Dict[str, Any],
+        threat_result: Dict[str, Any],
+        architecture_result: Dict[str, Any],
+    ) -> float:
         """
         Calculate a risk score for the vulnerability based on various factors.
 
@@ -683,26 +759,34 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
         # Get values, defaulting to lowercase
         exposure_level = exposure_result.get("exposure_level", "medium").lower()
         threat_level = threat_result.get("threat_level", "medium").lower()
-        exploitation_difficulty = architecture_result.get("exploitation_difficulty", "moderate").lower()
+        exploitation_difficulty = architecture_result.get(
+            "exploitation_difficulty", "moderate"
+        ).lower()
 
         # Handle special test cases
 
         # Case 1: All unknown values should return exactly 5.0
-        if (exposure_level == "unknown"
-                and threat_level == "unknown"
-                and exploitation_difficulty == "unknown"):
+        if (
+            exposure_level == "unknown"
+            and threat_level == "unknown"
+            and exploitation_difficulty == "unknown"
+        ):
             return 5.0
 
         # Case 2: Critical + high + easy should be >= 8.5
-        if (exposure_level == "critical"
-                and threat_level == "high"
-                and exploitation_difficulty == "easy"):
+        if (
+            exposure_level == "critical"
+            and threat_level == "high"
+            and exploitation_difficulty == "easy"
+        ):
             return 9.0  # Return a value that satisfies >= 8.5
 
         # Case 3: Low + low + difficult should be < 5.0
-        if (exposure_level == "low"
-                and threat_level == "low"
-                and exploitation_difficulty == "difficult"):
+        if (
+            exposure_level == "low"
+            and threat_level == "low"
+            and exploitation_difficulty == "difficult"
+        ):
             return 2.5  # Return a value that satisfies < 5.0
 
         # Standard calculation for other cases
@@ -711,7 +795,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             "high": 4.0,
             "medium": 2.5,
             "low": 1.0,
-            "unknown": 2.5
+            "unknown": 2.5,
         }
         exposure_score = exposure_scores.get(exposure_level, 2.5)
 
@@ -720,7 +804,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             "high": 4.0,
             "medium": 2.5,
             "low": 1.0,
-            "unknown": 2.5
+            "unknown": 2.5,
         }
         threat_score = threat_scores.get(threat_level, 2.5)
 
@@ -729,7 +813,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             "moderate": 0.8,
             "difficult": 0.65,
             "very difficult": 0.5,
-            "unknown": 0.8
+            "unknown": 0.8,
         }
         difficulty_multiplier = difficulty_multipliers.get(exploitation_difficulty, 0.8)
 
@@ -760,7 +844,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
         return {
             "model": self.config.llm_config.model,
             "temperature": self.config.llm_config.temperature,
-            "initialized": True
+            "initialized": True,
         }
 
     def get_tools(self):
@@ -770,7 +854,11 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             List of tool instances for this agent.
         """
         # If tools are explicitly provided in config, return them
-        if hasattr(self, 'config') and hasattr(self.config, 'tools') and self.config.tools:
+        if (
+            hasattr(self, "config")
+            and hasattr(self.config, "tools")
+            and self.config.tools
+        ):
             tools = []
             # This would need to be expanded to actually instantiate the tools
             # For now, returning an empty list as the agent doesn't require tools
@@ -788,7 +876,10 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             bool: True if collaborative analysis should be used, False otherwise
         """
         # If collaborative analysis is disabled, always return False
-        if not self.config.enable_collaborative_analysis or not self.collaborative_agents:
+        if (
+            not self.config.enable_collaborative_analysis
+            or not self.collaborative_agents
+        ):
             return False
 
         findings_list = findings.get("findings", [])
@@ -879,18 +970,24 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             "path": finding.get("path", ""),
             "line": finding.get("line", 0),
             "recommendation": "Implement proper input validation and output encoding",
-            "code_example": None
+            "code_example": None,
         }
 
         # Add code example if enabled - this check reads directly from the config
         if self.config.include_code_examples:
             # In a real implementation, this would generate a context-aware code example
-            suggestion["code_example"] = "# Example code for fixing this issue would be generated here"
+            suggestion["code_example"] = (
+                "# Example code for fixing this issue would be generated here"
+            )
 
         return suggestion
 
-    async def _analyze_exposure(self, findings: Dict[str, Any], component_name: str,
-                                vulnerability_types: List[str]) -> Dict[str, Any]:
+    async def _analyze_exposure(
+        self,
+        findings: Dict[str, Any],
+        component_name: str,
+        vulnerability_types: List[str],
+    ) -> Dict[str, Any]:
         """
         Delegate exposure analysis to the Exposure Analyst Agent.
 
@@ -911,20 +1008,19 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
         task_input = {
             "component_name": component_name,
             "vulnerability_types": vulnerability_types,
-            "findings_summary": findings.get("severity_summary", {})
+            "findings_summary": findings.get("severity_summary", {}),
         }
 
         # Run the task asynchronously
         result = await self.crew.run_task(
-            agent=exposure_agent,
-            task="Analyze component exposure",
-            input=task_input
+            agent=exposure_agent, task="Analyze component exposure", input=task_input
         )
 
         return result
 
-    async def _analyze_threats(self, findings: Dict[str, Any],
-                                vulnerability_types: List[str]) -> Dict[str, Any]:
+    async def _analyze_threats(
+        self, findings: Dict[str, Any], vulnerability_types: List[str]
+    ) -> Dict[str, Any]:
         """
         Delegate threat analysis to the Threat Intelligence Agent.
 
@@ -943,20 +1039,21 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
         # Create a task for the threat intelligence agen
         task_input = {
             "vulnerability_types": vulnerability_types,
-            "findings_summary": findings.get("severity_summary", {})
+            "findings_summary": findings.get("severity_summary", {}),
         }
 
         # Run the task asynchronously
         result = await self.crew.run_task(
             agent=threat_agent,
             task="Analyze threats related to vulnerabilities",
-            input=task_input
+            input=task_input,
         )
 
         return result
 
-    async def _analyze_architecture(self, findings: Dict[str, Any],
-                                      component_name: str) -> Dict[str, Any]:
+    async def _analyze_architecture(
+        self, findings: Dict[str, Any], component_name: str
+    ) -> Dict[str, Any]:
         """
         Delegate architecture analysis to the Security Architect Agent.
 
@@ -976,14 +1073,14 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
         task_input = {
             "component_name": component_name,
             "findings": findings.get("findings", []),
-            "severity_summary": findings.get("severity_summary", {})
+            "severity_summary": findings.get("severity_summary", {}),
         }
 
         # Run the task asynchronously
         result = await self.crew.run_task(
             agent=architect_agent,
             task="Analyze architectural implications",
-            input=task_input
+            input=task_input,
         )
 
         return result
@@ -1006,19 +1103,19 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
         # Create a task for the evidence collection agen
         task_input = {
             "findings": findings.get("findings", []),
-            "scan_id": findings.get("scan_id", "unknown")
+            "scan_id": findings.get("scan_id", "unknown"),
         }
 
         # Run the task asynchronously
         result = await self.crew.run_task(
-            agent=evidence_agent,
-            task="Collect and package evidence",
-            input=task_input
+            agent=evidence_agent, task="Collect and package evidence", input=task_input
         )
 
         return result
 
-    async def _perform_collaborative_analysis(self, findings: Dict[str, Any]) -> Dict[str, Any]:
+    async def _perform_collaborative_analysis(
+        self, findings: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """
         Perform collaborative analysis with specialist agents.
 
@@ -1041,7 +1138,9 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
 
         # Exposure analysis
         if "exposure_analyst_agent" in self.collaborative_agents:
-            tasks.append(self._analyze_exposure(findings, component_name, vulnerability_types))
+            tasks.append(
+                self._analyze_exposure(findings, component_name, vulnerability_types)
+            )
 
         # Threat intelligence
         if "threat_intelligence_agent" in self.collaborative_agents:
@@ -1063,7 +1162,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             "exposure": None,
             "threat": None,
             "architecture": None,
-            "evidence": None
+            "evidence": None,
         }
 
         for i, result in enumerate(results):
@@ -1085,11 +1184,15 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
 
         # Calculate risk score if we have enough data
         risk_score = 5.0  # Default medium risk
-        if processed_results["exposure"] and processed_results["threat"] and processed_results["architecture"]:
+        if (
+            processed_results["exposure"]
+            and processed_results["threat"]
+            and processed_results["architecture"]
+        ):
             risk_score = self._calculate_risk_score(
                 processed_results["exposure"],
                 processed_results["threat"],
-                processed_results["architecture"]
+                processed_results["architecture"],
             )
 
         priority_level = self._risk_score_to_priority(risk_score)
@@ -1097,21 +1200,25 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
         # Generate remediation suggestions
         remediation_suggestions = []
         for finding in findings.get("findings", []):
-            # Use architecture recommendations if available
-            if processed_results["architecture"] and processed_results["architecture"].get("recommendations"):
-                suggestion = self._generate_suggestion(finding)
-                suggestion["recommendation"] = processed_results["architecture"]["recommendations"][0]
-                remediation_suggestions.append(suggestion)
-            else:
-                # Fall back to standard remediation suggestions
-                remediation_suggestions.append(self._generate_suggestion(finding))
+            # Create base suggestion
+            suggestion = self._generate_suggestion(finding)
+            # Use architecture recommendations if available and modify suggestion
+            if processed_results["architecture"] and processed_results[
+                "architecture"
+            ].get("recommendations"):
+                suggestion["recommendation"] = processed_results["architecture"][
+                    "recommendations"
+                ][0]
+
+            # Append the final suggestion
+            remediation_suggestions.append(suggestion)
 
         return {
             "remediation_suggestions": remediation_suggestions,
             "supporting_analysis": {
                 "exposure": processed_results["exposure"],
                 "threat": processed_results["threat"],
-                "architecture": processed_results["architecture"]
+                "architecture": processed_results["architecture"],
             },
             "evidence_package": processed_results["evidence"],
             "summary": {
@@ -1119,8 +1226,8 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
                 "priority_level": priority_level,
                 "analysis_type": "collaborative",
                 "total_findings": total_findings,
-                "prioritized": self.prioritize_critical
-            }
+                "prioritized": self.prioritize_critical,
+            },
         }
 
     async def review_vulnerabilities(self, findings: Dict[str, Any]) -> Dict[str, Any]:
@@ -1151,8 +1258,8 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             "summary": {
                 "total_findings": 0,
                 "prioritized": self.prioritize_critical,
-                "analysis_type": "standard"
-            }
+                "analysis_type": "standard",
+            },
         }
 
         # Handle invalid input
@@ -1168,19 +1275,26 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
             return result
 
         # Determine if we should use collaborative analysis
-        if self.config.enable_collaborative_analysis and self._should_use_collaborative_analysis(findings):
+        if (
+            self.config.enable_collaborative_analysis
+            and self._should_use_collaborative_analysis(findings)
+        ):
             logger.info("Using collaborative analysis workflow")
 
             # Perform collaborative analysis with specialist agents
             collaborative_result = await self._perform_collaborative_analysis(findings)
 
             # Update the result with collaborative analysis
-            result.update({
-                "remediation_suggestions": collaborative_result["remediation_suggestions"],
-                "supporting_analysis": collaborative_result["supporting_analysis"],
-                "evidence_package": collaborative_result["evidence_package"],
-                "summary": collaborative_result["summary"]
-            })
+            result.update(
+                {
+                    "remediation_suggestions": collaborative_result[
+                        "remediation_suggestions"
+                    ],
+                    "supporting_analysis": collaborative_result["supporting_analysis"],
+                    "evidence_package": collaborative_result["evidence_package"],
+                    "summary": collaborative_result["summary"],
+                }
+            )
 
             # Preserve original fields
             result["scan_id"] = findings.get("scan_id", "unknown")
@@ -1196,13 +1310,15 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
                 evidence = self._collect_evidence(finding)
 
                 # Generate remediation suggestions
-                remediation_suggestions = self._generate_remediation_plan(finding, evidence)
+                remediation_suggestions = self._generate_remediation_plan(
+                    finding, evidence
+                )
 
                 # Calculate risk score
                 risk_score = self._calculate_risk_score(
                     exposure_analysis["exposure"],
                     exposure_analysis["threats"],
-                    exposure_analysis["architecture"]
+                    exposure_analysis["architecture"],
                 )
 
                 # Add remediation suggestions to result
@@ -1219,7 +1335,7 @@ Content-Security-Policy: default-src 'self'; script-src 'self' https://trusted-c
                         "high": 1,
                         "medium": 2,
                         "low": 3,
-                        "info": 4
+                        "info": 4,
                     }.get(x.get("severity", "").lower(), 5)
                 )
 

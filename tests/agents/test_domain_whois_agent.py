@@ -8,7 +8,10 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from agents.domain_whois_agent.domain_whois_agent import domain_whois_agent, domain_whois_agentConfig
+from agents.domain_whois_agent.domain_whois_agent import (
+    domain_whois_agent,
+    domain_whois_agentConfig,
+)
 from tools.whois_lookup.whois_tool import WhoisTool
 
 
@@ -30,7 +33,9 @@ def test_domain_whois_agent_initialization():
 def test_config_loading_from_yaml():
     """Test that the configuration loads correctly from a YAML file."""
     # Create a temporary YAML file with valid configuration
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".yaml", delete=False
+    ) as temp_file:
         yaml_content = """
         role: "Test WHOIS Agent"
         goal: "Test goal"
@@ -43,13 +48,13 @@ def test_config_loading_from_yaml():
         """
         temp_file.write(yaml_content)
         temp_file.flush()
-        
+
         try:
             # Test loading the configuration by reading the file first, then validating
-            with open(temp_file.name, 'r') as f:
+            with open(temp_file.name, "r") as f:
                 raw_config = yaml.safe_load(f)
             config = domain_whois_agentConfig.model_validate(raw_config)
-            
+
             # Verify the loaded config
             assert config.role == "Test WHOIS Agent"
             assert config.goal == "Test goal"
@@ -58,7 +63,7 @@ def test_config_loading_from_yaml():
             assert config.allow_delegation is False
             assert config.verbose is True
             assert config.memory is False
-            
+
         finally:
             # Clean up the temporary file
             os.unlink(temp_file.name)
@@ -67,7 +72,9 @@ def test_config_loading_from_yaml():
 def test_config_validation_errors():
     """Test that configuration validation correctly catches errors."""
     # Test with missing required fields
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".yaml", delete=False
+    ) as temp_file:
         invalid_yaml = """
         role: "Test WHOIS Agent"
         # Missing goal and backstory
@@ -76,17 +83,19 @@ def test_config_validation_errors():
         """
         temp_file.write(invalid_yaml)
         temp_file.flush()
-        
+
         try:
             with pytest.raises(ValidationError):
-                with open(temp_file.name, 'r') as f:
+                with open(temp_file.name, "r") as f:
                     raw_config = yaml.safe_load(f)
                 domain_whois_agentConfig.model_validate(raw_config)
         finally:
             os.unlink(temp_file.name)
-    
+
     # Test with invalid tool name - just check if the error message contains the expected text
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".yaml", delete=False
+    ) as temp_file:
         invalid_yaml = """
         role: "Test WHOIS Agent"
         goal: "Test goal"
@@ -97,7 +106,7 @@ def test_config_validation_errors():
         """
         temp_file.write(invalid_yaml)
         temp_file.flush()
-        
+
         try:
             with pytest.raises(ValueError):
                 # This should raise ValueError in post-validation
@@ -108,7 +117,9 @@ def test_config_validation_errors():
 
 def test_domain_whois_agent_with_custom_config():
     """Test the agent with a custom configuration file."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as temp_file:
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".yaml", delete=False
+    ) as temp_file:
         yaml_content = """
         role: "Custom WHOIS Agent"
         goal: "Custom goal"
@@ -124,18 +135,18 @@ def test_domain_whois_agent_with_custom_config():
         """
         temp_file.write(yaml_content)
         temp_file.flush()
-        
+
         try:
             # Initialize with custom config
             agent = domain_whois_agent(config_path=temp_file.name)
-            
+
             # Verify properties
             assert agent.agent.role == "Custom WHOIS Agent"
             assert agent.agent.goal == "Custom goal"
             assert agent.agent.backstory == "Custom backstory"
             assert agent.agent.allow_delegation is True
             assert agent.agent.verbose is False
-            
+
         finally:
             os.unlink(temp_file.name)
 
@@ -143,11 +154,11 @@ def test_domain_whois_agent_with_custom_config():
 def test_agent_tool_initialization():
     """Test that the agent correctly initializes its tools."""
     agent = domain_whois_agent()
-    
+
     # Verify tool instance
     assert "whois_lookup" in agent.tool_instances
     assert isinstance(agent.tool_instances["whois_lookup"], WhoisTool)
-    
+
     # Verify agent has the tool
     assert len(agent.agent.tools) == 1
     assert agent.agent.tools[0].name == "whois_lookup"
@@ -156,14 +167,14 @@ def test_agent_tool_initialization():
 def test_get_task_result_with_output():
     """Test the get_task_result method with a task that has output."""
     agent = domain_whois_agent()
-    
+
     # Create a mock task with output
     mock_task = mock.MagicMock()
     mock_task.output = {"domain_name": "example.com", "registrar": "Test Registrar"}
-    
+
     # Test the method
     result = agent.get_task_result(mock_task)
-    
+
     # Verify result
     assert result == {"domain_name": "example.com", "registrar": "Test Registrar"}
 
@@ -171,15 +182,15 @@ def test_get_task_result_with_output():
 def test_get_task_result_without_output():
     """Test the get_task_result method with a task that has no output."""
     agent = domain_whois_agent()
-    
+
     # Create a mock task without output
     mock_task = mock.MagicMock()
     # Remove the 'output' attribute
     del mock_task.output
-    
+
     # Test the method
     result = agent.get_task_result(mock_task)
-    
+
     # Verify result is an error message
     assert "error" in result
     assert result["error"] == "No output available"
@@ -194,24 +205,26 @@ def test_agent_whois_lookup_integration(mock_whois_run):
         "registrar": "Test Registrar",
         "creation_date": "2020-01-01",
         "expiration_date": "2025-01-01",
-        "name_servers": ["ns1.example.com", "ns2.example.com"]
+        "name_servers": ["ns1.example.com", "ns2.example.com"],
     }
-    
+
     # Mock the WhoisTool class to avoid accessing __annotations__ during initialization
-    with mock.patch("tools.whois_lookup.whois_tool.WhoisTool", spec=WhoisTool) as MockWhoisTool:
+    with mock.patch(
+        "tools.whois_lookup.whois_tool.WhoisTool", spec=WhoisTool
+    ) as MockWhoisTool:
         # Configure the mock tool
         mock_tool = MockWhoisTool.return_value
         mock_tool.name = "whois_lookup"
         mock_tool._run = mock_whois_run
-        
+
         # Mock the agent to use our mocked tool
         agent = mock.MagicMock()
         agent.agent = mock.MagicMock()
         agent.agent.execute.return_value = mock_whois_run.return_value
-        
+
         # Execute a task
         result = agent.agent.execute("Analyze the WHOIS information for example.com")
-        
+
         # Verify the result
         assert result["domain_name"] == "example.com"
         assert result["registrar"] == "Test Registrar"

@@ -10,9 +10,9 @@ from unittest import mock
 
 import boto3
 import pytest
+import requests
 import responses
 from azure.mgmt.frontdoor import FrontDoorManagementClient
-import requests
 
 from tools.waf_analysis_tool.waf_analysis_tool import WAFAnalysisInput, WAFAnalysisTool
 
@@ -34,14 +34,18 @@ def waf_tool():
         },
     ):
         # Mock the YAML loading to avoid file system dependency
-        with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-            "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-            "imperva_api_url": "https://api.imperva.com/api/v1",
-            "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-            "aws_region": "us-east-1",
-            "azure_api_version": "2020-11-01",
-            "request_timeout": 30,
-        }):
+        with mock.patch.object(
+            WAFAnalysisTool,
+            "_load_config_from_yaml",
+            return_value={
+                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                "imperva_api_url": "https://api.imperva.com/api/v1",
+                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                "aws_region": "us-east-1",
+                "azure_api_version": "2020-11-01",
+                "request_timeout": 30,
+            },
+        ):
             yield WAFAnalysisTool()
 
 
@@ -61,7 +65,9 @@ def test_validate_provider_invalid():
     """Test that invalid providers are rejected."""
     with pytest.raises(ValueError):
         WAFAnalysisInput(
-            provider="invalid-provider", query_type="configuration", resource_id="test-id"
+            provider="invalid-provider",
+            query_type="configuration",
+            resource_id="test-id",
         )
 
 
@@ -168,14 +174,18 @@ def test_query_imperva_missing_api_key():
     """Test querying Imperva WAF with missing API key."""
     with mock.patch.dict(os.environ, {"IMPERVA_API_KEY": ""}):
         # Mock the YAML loading
-        with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-            "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-            "imperva_api_url": "https://api.imperva.com/api/v1",
-            "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-            "aws_region": "us-east-1",
-            "azure_api_version": "2020-11-01",
-            "request_timeout": 30,
-        }):
+        with mock.patch.object(
+            WAFAnalysisTool,
+            "_load_config_from_yaml",
+            return_value={
+                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                "imperva_api_url": "https://api.imperva.com/api/v1",
+                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                "aws_region": "us-east-1",
+                "azure_api_version": "2020-11-01",
+                "request_timeout": 30,
+            },
+        ):
             waf_tool = WAFAnalysisTool()
             result = waf_tool._query_imperva("assets")
             assert "error" in result
@@ -278,14 +288,18 @@ def test_query_cloudflare_missing_api_key():
     """Test querying Cloudflare WAF with missing API key."""
     with mock.patch.dict(os.environ, {"CLOUDFLARE_API_KEY": ""}):
         # Mock the YAML loading
-        with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-            "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-            "imperva_api_url": "https://api.imperva.com/api/v1",
-            "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-            "aws_region": "us-east-1",
-            "azure_api_version": "2020-11-01",
-            "request_timeout": 30,
-        }):
+        with mock.patch.object(
+            WAFAnalysisTool,
+            "_load_config_from_yaml",
+            return_value={
+                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                "imperva_api_url": "https://api.imperva.com/api/v1",
+                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                "aws_region": "us-east-1",
+                "azure_api_version": "2020-11-01",
+                "request_timeout": 30,
+            },
+        ):
             waf_tool = WAFAnalysisTool()
             result = waf_tool._query_cloudflare("assets")
             assert "error" in result
@@ -393,14 +407,18 @@ def test_query_aws_missing_credentials():
         os.environ, {"AWS_ACCESS_KEY_ID": "", "AWS_SECRET_ACCESS_KEY": ""}
     ):
         # Mock the YAML loading
-        with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-            "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-            "imperva_api_url": "https://api.imperva.com/api/v1",
-            "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-            "aws_region": "us-east-1",
-            "azure_api_version": "2020-11-01",
-            "request_timeout": 30,
-        }):
+        with mock.patch.object(
+            WAFAnalysisTool,
+            "_load_config_from_yaml",
+            return_value={
+                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                "imperva_api_url": "https://api.imperva.com/api/v1",
+                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                "aws_region": "us-east-1",
+                "azure_api_version": "2020-11-01",
+                "request_timeout": 30,
+            },
+        ):
             waf_tool = WAFAnalysisTool()
             result = waf_tool._query_aws("assets")
             assert "error" in result
@@ -452,7 +470,10 @@ def test_query_azure_assets(waf_tool):
         FrontDoorManagementClient, "__new__"
     ) as mock_frontdoor_client:
         mock_client = mock.MagicMock()
-        mock_client.front_doors.list_all.return_value = [mock_frontdoor1, mock_frontdoor2]
+        mock_client.front_doors.list_all.return_value = [
+            mock_frontdoor1,
+            mock_frontdoor2,
+        ]
         mock_frontdoor_client.return_value = mock_client
 
         result = waf_tool._query_azure("assets", subscription_id)
@@ -482,7 +503,9 @@ def test_query_azure_configuration(waf_tool):
         result = waf_tool._query_azure("configuration", resource_id)
         assert "configuration" in result
         assert result["configuration"]["name"] == "fd1"
-        assert result["configuration"]["properties"]["routingRules"][0]["name"] == "rule1"
+        assert (
+            result["configuration"]["properties"]["routingRules"][0]["name"] == "rule1"
+        )
         mock_client.front_doors.get.assert_called_once_with("rg1", "fd1")
 
 
@@ -511,14 +534,18 @@ def test_query_azure_rules(waf_tool):
 def test_query_azure_missing_resource_id(waf_tool):
     """Test querying Azure WAF without resource ID when required."""
     # Mock the FrontDoor client to raise specific error
-    with mock.patch.object(FrontDoorManagementClient, "__new__", side_effect=TypeError("Mocked error")):
-        with mock.patch.object(waf_tool, "_query_azure", wraps=waf_tool._query_azure) as mock_query:
+    with mock.patch.object(
+        FrontDoorManagementClient, "__new__", side_effect=TypeError("Mocked error")
+    ):
+        with mock.patch.object(
+            waf_tool, "_query_azure", wraps=waf_tool._query_azure
+        ) as mock_query:
             # Prepare a custom mock implementation to replace the normal flow and return a controlled error
             def custom_impl(query_type, resource_id=None):
                 if query_type == "assets" and not resource_id:
                     return {"error": "Subscription ID required for assets query"}
                 return mock.DEFAULT  # Fall back to original implementation
-            
+
             mock_query.side_effect = custom_impl
             result = waf_tool._query_azure("assets")
             assert "error" in result
@@ -528,14 +555,20 @@ def test_query_azure_missing_resource_id(waf_tool):
 def test_query_azure_invalid_configuration_resource_id(waf_tool):
     """Test querying Azure WAF with invalid configuration resource ID format."""
     # Mock the FrontDoor client to raise specific error
-    with mock.patch.object(FrontDoorManagementClient, "__new__", side_effect=TypeError("Mocked error")):
-        with mock.patch.object(waf_tool, "_query_azure", wraps=waf_tool._query_azure) as mock_query:
+    with mock.patch.object(
+        FrontDoorManagementClient, "__new__", side_effect=TypeError("Mocked error")
+    ):
+        with mock.patch.object(
+            waf_tool, "_query_azure", wraps=waf_tool._query_azure
+        ) as mock_query:
             # Prepare a custom mock implementation to return a controlled error
             def custom_impl(query_type, resource_id=None):
                 if query_type == "configuration" and resource_id == "invalid-format":
-                    return {"error": "Resource ID required in format 'subscription_id/resource_group/name'"}
+                    return {
+                        "error": "Resource ID required in format 'subscription_id/resource_group/name'"
+                    }
                 return mock.DEFAULT  # Fall back to original implementation
-            
+
             mock_query.side_effect = custom_impl
             result = waf_tool._query_azure("configuration", "invalid-format")
             assert "error" in result
@@ -549,14 +582,18 @@ def test_query_azure_missing_credentials():
         {"AZURE_CLIENT_ID": "", "AZURE_CLIENT_SECRET": "", "AZURE_TENANT_ID": ""},
     ):
         # Mock the YAML loading
-        with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-            "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-            "imperva_api_url": "https://api.imperva.com/api/v1",
-            "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-            "aws_region": "us-east-1",
-            "azure_api_version": "2020-11-01",
-            "request_timeout": 30,
-        }):
+        with mock.patch.object(
+            WAFAnalysisTool,
+            "_load_config_from_yaml",
+            return_value={
+                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                "imperva_api_url": "https://api.imperva.com/api/v1",
+                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                "aws_region": "us-east-1",
+                "azure_api_version": "2020-11-01",
+                "request_timeout": 30,
+            },
+        ):
             waf_tool = WAFAnalysisTool()
             result = waf_tool._query_azure("assets", "sub123")
             assert "error" in result
@@ -611,7 +648,13 @@ def test_run_azure(waf_tool):
 def test_run_unsupported_provider(waf_tool):
     """Test the _run method with an unsupported provider."""
     # Override enabled_providers to include unsupported for testing
-    waf_tool.enabled_providers = ["imperva", "cloudflare", "aws", "azure", "unsupported"]
+    waf_tool.enabled_providers = [
+        "imperva",
+        "cloudflare",
+        "aws",
+        "azure",
+        "unsupported",
+    ]
     result = waf_tool._run("unsupported", "assets")
     assert "error" in result
     assert "Unsupported provider" in result["error"]
@@ -634,11 +677,11 @@ def test_arun_method(waf_tool):
     ) as mock_run:
         # Testing approach: replace the async method with a synchronous one for testing
         original_arun = waf_tool._arun
-        
+
         # Create a replacement non-async method
         def sync_arun(*args, **kwargs):
             return waf_tool._run(*args, **kwargs)
-        
+
         # Replace the async method temporarily
         waf_tool._arun = sync_arun
         try:
@@ -662,17 +705,22 @@ def test_initialization_with_custom_env_variables():
         },
     ):
         # Mock the YAML loading but make AWS_REGION respect environment
-        with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-            "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-            "imperva_api_url": "https://api.imperva.com/api/v1",
-            "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-            # Note: aws_region will be overridden by environment
-            "aws_region": "us-east-1",
-            "azure_api_version": "2020-11-01",
-            "request_timeout": 30,
-        }):
+        with mock.patch.object(
+            WAFAnalysisTool,
+            "_load_config_from_yaml",
+            return_value={
+                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                "imperva_api_url": "https://api.imperva.com/api/v1",
+                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                # Note: aws_region will be overridden by environment
+                "aws_region": "us-east-1",
+                "azure_api_version": "2020-11-01",
+                "request_timeout": 30,
+            },
+        ):
             # Create a mock for __init__ to override aws_region after super().__init__
             original_init = WAFAnalysisTool.__init__
+
             def patched_init(self, **kwargs):
                 original_init(self, **kwargs)
                 # Override aws_region with environment value
@@ -697,14 +745,18 @@ def test_initialization_with_default_timeout():
     with mock.patch.dict(os.environ, {}, clear=True):
         with mock.patch.dict(os.environ, {"IMPERVA_API_KEY": "test-key"}):
             # Mock the YAML loading
-            with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-                "imperva_api_url": "https://api.imperva.com/api/v1",
-                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-                "aws_region": "us-east-1",
-                "azure_api_version": "2020-11-01",
-                "request_timeout": 30,
-            }):
+            with mock.patch.object(
+                WAFAnalysisTool,
+                "_load_config_from_yaml",
+                return_value={
+                    "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                    "imperva_api_url": "https://api.imperva.com/api/v1",
+                    "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                    "aws_region": "us-east-1",
+                    "azure_api_version": "2020-11-01",
+                    "request_timeout": 30,
+                },
+            ):
                 tool = WAFAnalysisTool()
                 assert tool.request_timeout == 30  # Default value
 
@@ -730,16 +782,20 @@ def test_empty_response_handling():
     """Test handling of empty responses from APIs."""
     with mock.patch.dict(os.environ, {"IMPERVA_API_KEY": "test-key"}):
         # Mock the YAML loading
-        with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-            "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-            "imperva_api_url": "https://api.imperva.com/api/v1",
-            "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-            "aws_region": "us-east-1",
-            "azure_api_version": "2020-11-01",
-            "request_timeout": 30,
-        }):
+        with mock.patch.object(
+            WAFAnalysisTool,
+            "_load_config_from_yaml",
+            return_value={
+                "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+                "imperva_api_url": "https://api.imperva.com/api/v1",
+                "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+                "aws_region": "us-east-1",
+                "azure_api_version": "2020-11-01",
+                "request_timeout": 30,
+            },
+        ):
             tool = WAFAnalysisTool()
-            
+
             # Mock empty response
             responses.add(
                 responses.GET,
@@ -747,7 +803,7 @@ def test_empty_response_handling():
                 json={},
                 status=200,
             )
-            
+
             result = tool._query_imperva("assets")
             assert "assets" in result
             assert isinstance(result["assets"], dict)
@@ -755,6 +811,7 @@ def test_empty_response_handling():
 
 
 # --- CrewAI Tool Framework Integration Tests ---
+
 
 def test_input_schema_validation():
     """Test that the input schema validates correctly."""
@@ -764,7 +821,7 @@ def test_input_schema_validation():
         "query_type": "assets",
         "resource_id": "test-resource",
     }
-    
+
     # Validate with the input schema
     input_model = WAFAnalysisInput(**valid_input)
     assert input_model.provider == "aws"
@@ -776,14 +833,18 @@ def test_tool_description_and_metadata():
     """Test that the tool has the correct metadata for CrewAI integration."""
     assert WAFAnalysisTool.name == "waf_analysis_tool"
     # Create an instance to check the description
-    with mock.patch.object(WAFAnalysisTool, "_load_config_from_yaml", return_value={
-        "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
-        "imperva_api_url": "https://api.imperva.com/api/v1",
-        "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
-        "aws_region": "us-east-1",
-        "azure_api_version": "2020-11-01",
-        "request_timeout": 30,
-    }):
+    with mock.patch.object(
+        WAFAnalysisTool,
+        "_load_config_from_yaml",
+        return_value={
+            "enabled_providers": ["imperva", "cloudflare", "aws", "azure"],
+            "imperva_api_url": "https://api.imperva.com/api/v1",
+            "cloudflare_api_url": "https://api.cloudflare.com/client/v4",
+            "aws_region": "us-east-1",
+            "azure_api_version": "2020-11-01",
+            "request_timeout": 30,
+        },
+    ):
         tool = WAFAnalysisTool()
         assert "firewall" in tool.description.lower()
-        assert WAFAnalysisTool.input_schema == WAFAnalysisInput 
+        assert WAFAnalysisTool.input_schema == WAFAnalysisInput

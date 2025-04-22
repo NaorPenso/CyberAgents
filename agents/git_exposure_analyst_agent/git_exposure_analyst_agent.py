@@ -6,7 +6,7 @@ sensitive information in git repositories to mitigate security risks.
 
 import logging
 import os
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 from crewai import Agent
@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field, PrivateAttr, ValidationError
 
 from tools.github_search.github_search_tool import GitHubSearchTool
 from tools.trufflehog_scanner.trufflehog_scanner_tool import TruffleHogScannerTool
-from utils.llm_utils import create_llm
+from utils.llm_utils import create_central_llm
 
 from ..base_agent import BaseAgent
 
@@ -183,9 +183,9 @@ class GitExposureAnalystAgent(BaseAgent):
 
     _config: GitExposureAnalystAgentConfig = PrivateAttr()
 
-    def __init__(self):
-        """Initialize the Git Exposure Analyst Agent."""
-        super().__init__()
+    def __init__(self, llm: Any):
+        """Initialize the Git Exposure Analyst Agent with the passed LLM."""
+        super().__init__(llm)
 
         # Load configuration
         config_path = os.path.join(
@@ -197,14 +197,28 @@ class GitExposureAnalystAgent(BaseAgent):
         self.github_tool = GitHubSearchTool()
         self.trufflehog_tool = TruffleHogScannerTool()
 
+        # Determine tools based on config
+        agent_tools = []
+        if "github_search_tool" in self._config.tools:
+            agent_tools.append(self.github_tool)
+        if "trufflehog_scanner_tool" in self._config.tools:
+            agent_tools.append(self.trufflehog_tool)
+
+        # LLM instantiation - REMOVED, use self.llm from super
+        # central_llm = create_central_llm()
+
         self.agent = Agent(
             role=self._config.role,
             goal=self._config.goal,
             backstory=self._config.backstory,
-            tools=[self.github_tool, self.trufflehog_tool],
+            tools=agent_tools,
             verbose=self._config.verbose,
             allow_delegation=self._config.allow_delegation,
-            llm=create_llm(),
+            memory=self._config.memory,
+            cache=self._config.cache,
+            max_iter=self._config.max_iterations,
+            max_rpm=self._config.max_rpm,
+            llm=self.llm,
         )
 
         self.agent_name = "GitExposureAnalystAgent"
@@ -212,7 +226,7 @@ class GitExposureAnalystAgent(BaseAgent):
         self.agent_goal = self._config.goal
         self.agent_backstory = self._config.backstory
 
-        logger.info("Git Exposure Analyst Agent initialized")
+        logger.info(f"Git Exposure Analyst Agent {self._config.role} initialized")
 
     def _load_config(self, config_path) -> GitExposureAnalystAgentConfig:
         """Load the agent configuration from a YAML file.
@@ -294,3 +308,7 @@ class GitExposureAnalystAgent(BaseAgent):
                 f"### Repository Information\n\n{github_info}\n\n"
                 f"### Secret Scan Results\n\n{trufflehog_scan}"
             )
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent

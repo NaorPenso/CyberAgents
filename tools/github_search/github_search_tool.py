@@ -9,10 +9,9 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from crewai.tools import BaseTool
-from pydantic import PrivateAttr, Field, ConfigDict
-
 import requests
+from crewai.tools import BaseTool
+from pydantic import ConfigDict, Field, PrivateAttr
 
 logger = logging.getLogger(__name__)
 

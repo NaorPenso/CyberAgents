@@ -13,6 +13,7 @@ from crewai import Agent
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, ValidationError
 
 from tools.whois_lookup.whois_tool import WhoisTool
+from utils.llm_utils import create_central_llm
 
 from ..base_agent import BaseAgent
 
@@ -103,14 +104,15 @@ class domain_whois_agent(BaseAgent):
 
     config: domain_whois_agentConfig
 
-    def __init__(self, config_path: Optional[str] = None):
-        """Initialize the domain_whois_agent.
+    def __init__(self, llm: Any, config_path: Optional[str] = None):
+        """Initialize the domain_whois_agent with the passed LLM.
 
         Args:
+            llm: The language model instance to use.
             config_path: Path to the configuration YAML file. If None, uses default.
         """
-        # Call super() first for consistency
-        super().__init__()
+        # Call super() first, passing the LLM
+        super().__init__(llm)
 
         if config_path is None:
             config_path = os.path.join(
@@ -133,7 +135,10 @@ class domain_whois_agent(BaseAgent):
             self.tool_instances[tool_name] for tool_name in self.config.tools
         ]
 
-        # Explicitly create the crewai.Agent instance
+        # <<< REMOVED: LLM instantiation >>>
+        # central_llm = create_central_llm()
+
+        # Explicitly create the crewai.Agent instance using PASSED LLM
         self.agent = Agent(
             role=self.config.role,
             goal=self.config.goal,
@@ -147,6 +152,8 @@ class domain_whois_agent(BaseAgent):
             cache=self.config.cache,
             # Assuming default LLM if not specified, or add llm_config handling here
             # llm=create_llm() # Might need to import create_llm if needed
+            # <<< UPDATED: LLM assignment >>>
+            llm=self.llm,  # Use the llm passed via __init__ / stored in self.llm by super()
         )
 
         # Assign attributes for potential direct access (optional but consistent)
@@ -202,6 +209,10 @@ class domain_whois_agent(BaseAgent):
         except Exception as e:
             logger.error(f"Unexpected error loading config from {config_path}: {e}")
             return None
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent
 
     def get_task_result(self, task: Any) -> Dict:
         """Process the result of a task execution.

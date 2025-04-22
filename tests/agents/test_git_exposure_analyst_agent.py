@@ -95,7 +95,9 @@ def test_config_model_validation(valid_config_dict):
 
 
 @patch("agents.git_exposure_analyst_agent.git_exposure_analyst_agent.GitHubSearchTool")
-@patch("agents.git_exposure_analyst_agent.git_exposure_analyst_agent.TruffleHogScannerTool")
+@patch(
+    "agents.git_exposure_analyst_agent.git_exposure_analyst_agent.TruffleHogScannerTool"
+)
 @patch("agents.git_exposure_analyst_agent.git_exposure_analyst_agent.Agent")
 @patch("agents.git_exposure_analyst_agent.git_exposure_analyst_agent.create_llm")
 def test_agent_initialization(
@@ -114,13 +116,15 @@ def test_agent_initialization(
 
     # Test with temporary config file path
     with patch.object(
-        GitExposureAnalystAgent, "_load_config", return_value=GitExposureAnalystAgentConfig(
+        GitExposureAnalystAgent,
+        "_load_config",
+        return_value=GitExposureAnalystAgentConfig(
             role="Git Exposure Analyst",
             goal="Test goal",
             backstory="Test backstory",
             tools=["github_search", "trufflehog_scanner"],
             allow_delegation=False,
-        )
+        ),
     ):
         agent = GitExposureAnalystAgent()
         assert agent is not None
@@ -145,9 +149,7 @@ def test_agent_initialization(
 
 def test_load_config_valid(temp_config_file):
     """Test loading a valid configuration file."""
-    with patch.object(
-        GitExposureAnalystAgent, "__init__", return_value=None
-    ):
+    with patch.object(GitExposureAnalystAgent, "__init__", return_value=None):
         agent = GitExposureAnalystAgent()
         config = agent._load_config(temp_config_file)
         assert isinstance(config, GitExposureAnalystAgentConfig)
@@ -160,9 +162,7 @@ def test_load_config_valid(temp_config_file):
 
 def test_load_config_invalid(temp_invalid_config_file):
     """Test loading an invalid configuration file returns default config."""
-    with patch.object(
-        GitExposureAnalystAgent, "__init__", return_value=None
-    ):
+    with patch.object(GitExposureAnalystAgent, "__init__", return_value=None):
         agent = GitExposureAnalystAgent()
         config = agent._load_config(temp_invalid_config_file)
         # Should return default config when validation fails
@@ -175,9 +175,7 @@ def test_load_config_invalid(temp_invalid_config_file):
 
 def test_load_config_missing_file():
     """Test handling of a missing configuration file."""
-    with patch.object(
-        GitExposureAnalystAgent, "__init__", return_value=None
-    ):
+    with patch.object(GitExposureAnalystAgent, "__init__", return_value=None):
         agent = GitExposureAnalystAgent()
         config = agent._load_config("/path/does/not/exist.yaml")
         # Should return default config when file doesn't exist
@@ -194,16 +192,16 @@ def test_analyze_repository_local():
     agent = MagicMock(spec=GitExposureAnalystAgent)
     mock_trufflehog_tool = MagicMock()
     mock_trufflehog_tool._run.return_value = "Local scan results"
-    
+
     # Set up the mock for the agent
     agent.trufflehog_tool = mock_trufflehog_tool
-    
+
     # Get the real method but bound to our mock
     analyze_repo_method = GitExposureAnalystAgent.analyze_repository.__get__(agent)
-    
+
     # Call the method on our mock
     result = analyze_repo_method("/path/to/local/repo", is_local=True)
-    
+
     # Check that the correct tool was called
     mock_trufflehog_tool._run.assert_called_once_with("local:/path/to/local/repo")
     assert result == "Local scan results"
@@ -217,21 +215,21 @@ def test_analyze_repository_remote():
     mock_trufflehog_tool = MagicMock()
     mock_github_tool._run.return_value = "GitHub info"
     mock_trufflehog_tool._run.return_value = "TruffleHog scan results"
-    
+
     # Set up the mocks for the agent
     agent.github_tool = mock_github_tool
     agent.trufflehog_tool = mock_trufflehog_tool
-    
+
     # Get the real method but bound to our mock
     analyze_repo_method = GitExposureAnalystAgent.analyze_repository.__get__(agent)
-    
+
     # Call the method on our mock
     result = analyze_repo_method("owner/repo", is_local=False)
-    
+
     # Check that both tools were called with correct parameters
     mock_github_tool._run.assert_called_once_with("repo:owner/repo")
     mock_trufflehog_tool._run.assert_called_once_with("github:owner/repo")
-    
+
     # Check that the result contains both tool outputs
     assert "GitHub info" in result
     assert "TruffleHog scan results" in result

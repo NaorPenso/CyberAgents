@@ -2,14 +2,13 @@
 
 import logging
 import os
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional
 
 import yaml
 from crewai import Agent
 from pydantic import BaseModel, Field, HttpUrl, ValidationError
 
 from agents.base_agent import BaseAgent
-from utils.llm_utils import create_llm
 
 logger = logging.getLogger(__name__)
 
@@ -78,9 +77,9 @@ class SecurityManagerAgent(BaseAgent):
 
     config: AgentConfigModel
 
-    def __init__(self):
-        """Initializes the agent with its configuration."""
-        super().__init__()
+    def __init__(self, llm: Any):
+        """Initializes the agent with its configuration and the passed LLM."""
+        super().__init__(llm)
 
         # Load configuration from YAML file
         config_path = os.path.join(os.path.dirname(__file__), "agent.yaml")
@@ -91,7 +90,7 @@ class SecurityManagerAgent(BaseAgent):
 
         self.config = loaded_config
 
-        # Initialize the agent with the loaded configuration
+        # Initialize the agent with the loaded configuration and PASSED LLM
         self.agent = Agent(
             role=self.config.role,
             goal=self.config.goal,
@@ -103,7 +102,7 @@ class SecurityManagerAgent(BaseAgent):
             cache=self.config.cache,
             max_iter=self.config.max_iterations,
             max_rpm=self.config.max_rpm,
-            llm=create_llm(),
+            llm=self.llm,
         )
 
         self.agent_name = "SecurityManagerAgent"
@@ -146,3 +145,7 @@ class SecurityManagerAgent(BaseAgent):
         except Exception as e:
             logger.error(f"Unexpected error loading config from {config_path}: {e}")
             return None
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent

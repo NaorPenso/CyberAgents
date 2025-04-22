@@ -5,13 +5,13 @@ assess the deliverability and security posture of an email address.
 """
 
 import logging
+from typing import Any
 
 # Import necessary components
 from crewai import Agent
 
 from agents.base_agent import BaseAgent
 from tools.email_validation.email_validation_tool import EmailValidationTool
-from utils.llm_utils import create_llm
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +22,9 @@ class EmailSecurityAgent(BaseAgent):
     Uses the EmailSecurityTool to check MX, SPF, and DMARC records.
     """
 
-    def __init__(self):
-        """Initialize the Email Security Agent."""
-        super().__init__()
+    def __init__(self, llm: Any):
+        """Initialize the Email Security Agent with the passed LLM."""
+        super().__init__(llm)
         self.agent_name = "EmailSecurityAgent"
         self.agent_role = "Email Security Specialist"
         self.agent_goal = (
@@ -39,13 +39,17 @@ class EmailSecurityAgent(BaseAgent):
         self.agent_tools = [EmailValidationTool()]
         logger.info("Email Security Agent initialized")
 
-        # Initialize the crewai Agent
+        # Initialize the crewai Agent using PASSED LLM
         self.agent = Agent(
             role=self.agent_role,
             goal=self.agent_goal,
             backstory=self.agent_backstory,
             tools=self.agent_tools,
-            llm=create_llm(),
+            llm=self.llm,
             verbose=True,
             allow_delegation=False,
         )
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent
