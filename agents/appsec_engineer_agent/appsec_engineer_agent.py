@@ -7,7 +7,7 @@ This agent leverages the SemgrepTool to analyze code for security vulnerabilitie
 import logging
 import os
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import yaml
 from crewai import Agent
@@ -17,7 +17,6 @@ from agents.base_agent import BaseAgent
 
 # Import the actual tool
 from tools.semgrep_scanner.semgrep_scanner import SemgrepTool
-from utils.llm_utils import create_central_llm
 
 # Remove unused RateLimiter import
 # from utils.rate_limiter import RateLimiter
@@ -72,11 +71,12 @@ class AppSecEngineerAgent(BaseAgent):
     agent: Agent  # Add type hint for the CrewAI agent instance
     semgrep_tool: SemgrepTool  # Store the tool instance
 
-    def __init__(self):
+    def __init__(self, llm: Any):
         """
-        Initialize the AppSec Engineer Agent. Loads config and initializes the SemgrepTool.
+        Initialize the AppSec Engineer Agent with the passed LLM.
+        Loads config and initializes the SemgrepTool.
         """
-        super().__init__()
+        super().__init__(llm)  # Pass llm to BaseAgent
 
         self.config = self._load_config()
 
@@ -84,9 +84,6 @@ class AppSecEngineerAgent(BaseAgent):
         # Tool configuration (rules, timeout etc.) should be handled within the tool itself,
         # potentially loading its own tool.yaml or using defaults.
         self.semgrep_tool = SemgrepTool()
-
-        # <<< ADDED: LLM instantiation >>>
-        central_llm = create_central_llm()
 
         # Initialize the CrewAI Agent
         self.agent = Agent(
@@ -97,11 +94,10 @@ class AppSecEngineerAgent(BaseAgent):
             allow_delegation=self.config.allow_delegation,
             # Pass the instantiated tool
             tools=[self.semgrep_tool],
-            # llm=self.get_llm() # Assuming a method to get the LLM
             max_iter=self.config.max_iterations,
             max_rpm=self.config.max_rpm,
-            # <<< ADDED: LLM assignment >>>
-            llm=central_llm,
+            # <<< UPDATED: LLM assignment >>>
+            llm=self.llm,  # Use the llm passed via __init__ / stored in self.llm by super()
         )
         logger.info(
             f"AppSecEngineerAgent initialized with tool: {self.semgrep_tool.name}"
@@ -139,6 +135,10 @@ class AppSecEngineerAgent(BaseAgent):
         except Exception as e:
             logger.error(f"An unexpected error occurred while loading config: {e}")
             raise
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent
 
     # --- Remove analyze_code method --- (Handled by SemgrepTool)
 

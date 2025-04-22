@@ -6,7 +6,7 @@ sensitive information in git repositories to mitigate security risks.
 
 import logging
 import os
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 import yaml
 from crewai import Agent
@@ -183,9 +183,9 @@ class GitExposureAnalystAgent(BaseAgent):
 
     _config: GitExposureAnalystAgentConfig = PrivateAttr()
 
-    def __init__(self):
-        """Initialize the Git Exposure Analyst Agent."""
-        super().__init__()
+    def __init__(self, llm: Any):
+        """Initialize the Git Exposure Analyst Agent with the passed LLM."""
+        super().__init__(llm)
 
         # Load configuration
         config_path = os.path.join(
@@ -204,8 +204,8 @@ class GitExposureAnalystAgent(BaseAgent):
         if "trufflehog_scanner_tool" in self._config.tools:
             agent_tools.append(self.trufflehog_tool)
 
-        # LLM instantiation
-        central_llm = create_central_llm()
+        # LLM instantiation - REMOVED, use self.llm from super
+        # central_llm = create_central_llm()
 
         self.agent = Agent(
             role=self._config.role,
@@ -218,7 +218,7 @@ class GitExposureAnalystAgent(BaseAgent):
             cache=self._config.cache,
             max_iter=self._config.max_iterations,
             max_rpm=self._config.max_rpm,
-            llm=central_llm,
+            llm=self.llm,
         )
 
         self.agent_name = "GitExposureAnalystAgent"
@@ -308,3 +308,7 @@ class GitExposureAnalystAgent(BaseAgent):
                 f"### Repository Information\n\n{github_info}\n\n"
                 f"### Secret Scan Results\n\n{trufflehog_scan}"
             )
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent

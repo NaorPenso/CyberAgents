@@ -1,0 +1,25 @@
+# Configuration for the Subdomain Finder Tool (crt.sh)
+# Conforms to schemas/tool_schema.yaml
+
+tool:
+  name: "subdomain_finder_crtsh"
+  description: "Discovers subdomains of a given domain using certificate transparency logs (crt.sh)."
+  version: "1.0.0"
+
+configuration:
+  parameters:
+    # This tool primarily takes its input ('domain') via the agent's task execution,
+    # not through static configuration parameters.
+    # If API keys or other settings were needed, they would be defined here.
+    # Example (if an API key were needed):
+    # crtsh_api_key:
+    #   type: "string"
+    #   description: "Optional API Key for crt.sh (if applicable)"
+    #   required: false
+    #   default: null # Or an empty string ""
+    _note: "No configurable parameters required for this tool via YAML."
+
+  dependencies:
+    # List required Python packages
+    - "requests"
+    # Add other dependencies if identified, e.g., specific versions

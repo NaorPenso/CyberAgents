@@ -1,6 +1,7 @@
 """Agent responsible for identifying external exposure and attack surface."""
 
 import logging
+from typing import Any
 
 from crewai import Agent
 
@@ -25,8 +26,9 @@ class ExposureAnalystAgent(BaseAgent):  # Inherit from BaseAgent
     It dynamically uses tools based on available API keys and system capabilities (Nmap).
     """
 
-    def __init__(self):
-        """Initializes the agent, dynamically selecting tools."""
+    def __init__(self, llm: Any):
+        """Initializes the agent, dynamically selecting tools, using the passed LLM."""
+        super().__init__(llm)
 
         available_tools = []
         tool_descriptions = []
@@ -109,7 +111,11 @@ class ExposureAnalystAgent(BaseAgent):  # Inherit from BaseAgent
                 + " You provide a structured list and summary of discovered assets and their potential exposures."
             ),
             tools=available_tools,
-            llm=create_central_llm(),
+            llm=self.llm,
             verbose=True,
             allow_delegation=False,
         )
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        return self.agent

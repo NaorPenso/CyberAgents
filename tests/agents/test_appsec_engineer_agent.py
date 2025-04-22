@@ -2,13 +2,17 @@
 
 import os
 import shutil
-from unittest.mock import patch, MagicMock
-import yaml
+from unittest.mock import MagicMock, patch
+
 import pytest
+import yaml
 from pydantic import ValidationError
 
 # Import the refactored agent and the tool it uses
-from agents.appsec_engineer_agent.appsec_engineer_agent import AppSecEngineerAgent, AgentYamlModel
+from agents.appsec_engineer_agent.appsec_engineer_agent import (
+    AgentYamlModel,
+    AppSecEngineerAgent,
+)
 from tools.semgrep_scanner.semgrep_scanner import SemgrepTool
 
 # Remove unused RateLimiter import
@@ -17,7 +21,8 @@ from tools.semgrep_scanner.semgrep_scanner import SemgrepTool
 # Check if semgrep executable exists - less critical now as tests should mock the tool
 SEMGREP_EXECUTABLE = shutil.which("semgrep")
 skip_if_no_semgrep = pytest.mark.skipif(
-    SEMGREP_EXECUTABLE is None, reason="Semgrep executable not found in PATH (though tests should mock)"
+    SEMGREP_EXECUTABLE is None,
+    reason="Semgrep executable not found in PATH (though tests should mock)",
 )
 
 # Mock config data matching the simplified AgentYamlModel
@@ -36,6 +41,7 @@ MOCK_AGENT_YAML_DATA = {
     "config": {"temp_dir": "/tmp/test"},
 }
 
+
 @pytest.fixture
 def mock_yaml_load(monkeypatch):
     """Fixture to mock yaml.safe_load."""
@@ -45,8 +51,9 @@ def mock_yaml_load(monkeypatch):
     monkeypatch.setattr("pathlib.Path.is_file", MagicMock(return_value=True))
     return mock_load
 
+
 @pytest.fixture
-def appsec_agent(mock_yaml_load): # Depend on the mock fixture
+def appsec_agent(mock_yaml_load):  # Depend on the mock fixture
     """Create an AppSec Engineer Agent instance for testing, using mocked config."""
     try:
         # Initialization should now use the mocked yaml.safe_load
@@ -55,9 +62,11 @@ def appsec_agent(mock_yaml_load): # Depend on the mock fixture
     except Exception as e:
         pytest.fail(f"Failed to initialize AppSecEngineerAgent with mocked config: {e}")
 
+
 # --- Remove TestCodeLanguageDetector --- (Class removed from agent)
 
 # --- Remove TestSemgrepRunner --- (Class removed from agent)
+
 
 class TestAppSecEngineerAgent:
     """Test the refactored AppSec Engineer Agent functionality."""
@@ -69,16 +78,21 @@ class TestAppSecEngineerAgent:
         assert isinstance(appsec_agent.config, AgentYamlModel)
         assert appsec_agent.config.role == MOCK_AGENT_YAML_DATA["role"]
         assert appsec_agent.config.goal == MOCK_AGENT_YAML_DATA["goal"]
-        assert appsec_agent.config.max_iterations == MOCK_AGENT_YAML_DATA["max_iterations"]
+        assert (
+            appsec_agent.config.max_iterations == MOCK_AGENT_YAML_DATA["max_iterations"]
+        )
 
         # Check the underlying CrewAI agent instance
-        assert hasattr(appsec_agent, 'agent')
+        assert hasattr(appsec_agent, "agent")
         assert appsec_agent.agent.role == MOCK_AGENT_YAML_DATA["role"]
         assert appsec_agent.agent.goal == MOCK_AGENT_YAML_DATA["goal"]
-        assert appsec_agent.agent.allow_delegation == MOCK_AGENT_YAML_DATA["allow_delegation"]
+        assert (
+            appsec_agent.agent.allow_delegation
+            == MOCK_AGENT_YAML_DATA["allow_delegation"]
+        )
 
         # Check that the SemgrepTool is instantiated and assigned
-        assert hasattr(appsec_agent, 'semgrep_tool')
+        assert hasattr(appsec_agent, "semgrep_tool")
         assert isinstance(appsec_agent.semgrep_tool, SemgrepTool)
 
         # Check that the tool is correctly passed to the CrewAI agent
@@ -102,7 +116,7 @@ class TestAppSecEngineerAgent:
     def test_initialization_validation_error(self, monkeypatch):
         """Test initialization failure with invalid config data (missing required field)."""
         invalid_data = MOCK_AGENT_YAML_DATA.copy()
-        del invalid_data["role"] # Remove a required field
+        del invalid_data["role"]  # Remove a required field
         mock_load = MagicMock(return_value=invalid_data)
         monkeypatch.setattr("yaml.safe_load", mock_load)
         monkeypatch.setattr("pathlib.Path.is_file", MagicMock(return_value=True))

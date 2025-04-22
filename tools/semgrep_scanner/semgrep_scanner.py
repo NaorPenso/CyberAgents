@@ -22,12 +22,7 @@ from typing import Any, ClassVar, Dict, Optional, Type
 from crewai.tools import BaseTool
 
 # Pydantic imports
-from pydantic import (
-    BaseModel,
-    ConfigDict,
-    Field,
-    model_validator,
-)
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 _project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 if _project_root not in sys.path:
@@ -223,8 +218,7 @@ class SemgrepTool(BaseTool):
                 if not os.path.exists(resolved_path):
                     return {
                         "error": (
-                            f"Provided local_path does not exist: "
-                            f"{resolved_path}"
+                            f"Provided local_path does not exist: " f"{resolved_path}"
                         )
                     }
                 scan_target_path = resolved_path
@@ -243,8 +237,7 @@ class SemgrepTool(BaseTool):
                 is_temporary = True
                 cleanup_path = scan_target_path  # Mark for cleanup
                 logger.info(
-                    "Scanning code snippet in temporary file: "
-                    f"{scan_target_path}"
+                    "Scanning code snippet in temporary file: " f"{scan_target_path}"
                 )
 
             # 2. Run Semgrep Scan

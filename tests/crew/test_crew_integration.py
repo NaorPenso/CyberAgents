@@ -1,7 +1,5 @@
 """Integration tests for the domain analysis crew."""
 
-from agents.security_manager_agent.security_manager_agent import SecurityManagerAgent
-from agents.dns_analyzer_agent.dns_analyzer_agent import DNSAnalyzerAgent
 import asyncio
 import copy
 import json
@@ -12,6 +10,8 @@ from crewai import Agent, Crew, Process, Task
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 
+from agents.dns_analyzer_agent.dns_analyzer_agent import DNSAnalyzerAgent
+from agents.security_manager_agent.security_manager_agent import SecurityManagerAgent
 from tools import DNSTool, ThreatTool, WhoisTool
 
 # Load environment variables

@@ -7,12 +7,12 @@ about protected assets.
 
 import logging
 import os
-import yaml
 from pathlib import Path
 from typing import Any, ClassVar, Dict, List, Optional
 
 import boto3
 import requests
+import yaml
 from azure.identity import ClientSecretCredential
 from azure.mgmt.frontdoor import FrontDoorManagementClient
 from crewai.tools import BaseTool
@@ -79,7 +79,9 @@ class WAFAnalysisTool(BaseTool):
     input_schema: ClassVar[type] = WAFAnalysisInput
 
     # Configuration defaults (will be overridden by YAML config)
-    enabled_providers: List[str] = Field(default=["imperva", "cloudflare", "aws", "azure"])
+    enabled_providers: List[str] = Field(
+        default=["imperva", "cloudflare", "aws", "azure"]
+    )
     imperva_api_url: str = Field(default="https://api.imperva.com/api/v1")
     cloudflare_api_url: str = Field(default="https://api.cloudflare.com/client/v4")
     aws_region: str = Field(default="us-east-1")
@@ -91,7 +93,7 @@ class WAFAnalysisTool(BaseTool):
     @classmethod
     def _load_config_from_yaml(cls):
         """Load configuration from tool.yaml file.
-        
+
         Returns:
             Dict containing configuration values
         """
@@ -99,24 +101,36 @@ class WAFAnalysisTool(BaseTool):
             # Get the directory containing this file
             current_dir = Path(__file__).parent
             config_path = current_dir / "tool.yaml"
-            
+
             # Load YAML configuration
             with open(config_path, "r") as file:
                 config = yaml.safe_load(file)
-            
+
             # Extract parameters from configuration
             parameters = config.get("configuration", {}).get("parameters", {})
-            
+
             # Create a dictionary of configuration values
             yaml_config = {
-                "enabled_providers": parameters.get("enabled_providers", {}).get("default", ["imperva", "cloudflare", "aws", "azure"]),
-                "imperva_api_url": parameters.get("imperva_api_url", {}).get("default", "https://api.imperva.com/api/v1"),
-                "cloudflare_api_url": parameters.get("cloudflare_api_url", {}).get("default", "https://api.cloudflare.com/client/v4"),
-                "aws_region": parameters.get("aws_region", {}).get("default", "us-east-1"),
-                "azure_api_version": parameters.get("azure_api_version", {}).get("default", "2020-11-01"),
-                "request_timeout": parameters.get("request_timeout", {}).get("default", 30),
+                "enabled_providers": parameters.get("enabled_providers", {}).get(
+                    "default", ["imperva", "cloudflare", "aws", "azure"]
+                ),
+                "imperva_api_url": parameters.get("imperva_api_url", {}).get(
+                    "default", "https://api.imperva.com/api/v1"
+                ),
+                "cloudflare_api_url": parameters.get("cloudflare_api_url", {}).get(
+                    "default", "https://api.cloudflare.com/client/v4"
+                ),
+                "aws_region": parameters.get("aws_region", {}).get(
+                    "default", "us-east-1"
+                ),
+                "azure_api_version": parameters.get("azure_api_version", {}).get(
+                    "default", "2020-11-01"
+                ),
+                "request_timeout": parameters.get("request_timeout", {}).get(
+                    "default", 30
+                ),
             }
-            
+
             logger.info(f"Loaded WAF Analysis Tool configuration from {config_path}")
             return yaml_config
         except Exception as e:
@@ -135,7 +149,7 @@ class WAFAnalysisTool(BaseTool):
         """Initialize the WAF Analysis Tool."""
         # Initialize with default values first
         super().__init__(**kwargs)
-        
+
         # Load configuration from YAML and update instance attributes
         config = self._load_config_from_yaml()
         for key, value in config.items():
@@ -149,7 +163,7 @@ class WAFAnalysisTool(BaseTool):
         # AWS credentials
         self.aws_access_key = os.getenv("AWS_ACCESS_KEY_ID")
         self.aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-        
+
         # Override AWS region from environment if specified
         env_region = os.getenv("AWS_REGION")
         if env_region:
@@ -181,7 +195,7 @@ class WAFAnalysisTool(BaseTool):
         # Check if the provider is enabled
         if provider not in self.enabled_providers:
             return {"error": f"Provider '{provider}' is not enabled in configuration"}
-            
+
         try:
             # Call the appropriate provider method based on provider parameter
             if provider == "imperva":

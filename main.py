@@ -193,7 +193,7 @@ class DomainIntelligenceCrew:
             try:
                 # Pass the LLM instance to the agent class constructor
                 # Assumes AgentClass.__init__ accepts 'llm' and uses it for its internal crewai.Agent
-                instance = AgentClass()
+                instance = AgentClass(llm=self.llm)
                 self.agents_instances[name] = instance
                 # Assuming each class instance has an 'agent' attribute holding the crewai.Agent
                 if hasattr(instance, "agent") and isinstance(instance.agent, Agent):
@@ -454,22 +454,61 @@ def main():
 
     args = parser.parse_args()
 
-    # Configure logging level based on verbosity
-    if not args.verbose:
-        # Set root logger level higher to suppress INFO messages from libraries like crewai
-        logging.getLogger().setLevel(logging.WARNING)
-        # You might need to specifically target crewai's logger if it configures itself
-        logging.getLogger("crewai").setLevel(logging.WARNING)
-        logging.getLogger("LiteLLM").setLevel(
-            logging.WARNING
-        )  # Also suppress LiteLLM info
-        # Keep our own logger at INFO if needed for specific messages, or set it higher too
-        logger.setLevel(logging.INFO)  # Keep main logger at INFO for start/end messages
+    # --- Disable CrewAI Telemetry --- #
+    # Set environment variable BEFORE any CrewAI components are initialized
+    os.environ["CREWAI_DISABLE_TELEMETRY"] = "true"
+    logger.info(
+        "CrewAI Telemetry explicitly disabled via CREWAI_DISABLE_TELEMETRY environment variable."
+    )
+
+    # --- Logging Configuration START ---
+    # Determine the target logging level name
+    if args.verbose:
+        target_level_name = "DEBUG"
     else:
-        # Ensure our main logger and others are at INFO/DEBUG if verbose
-        logging.getLogger().setLevel(logging.INFO)
-        logger.setLevel(logging.INFO)
-        # crewai verbosity is handled by passing verbose=True to the Crew/Agent
+        env_log_level = os.getenv("LOG_LEVEL")
+        if env_log_level:
+            env_log_level_upper = env_log_level.strip().upper()
+            valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+            if env_log_level_upper in valid_levels:
+                target_level_name = env_log_level_upper
+            else:
+                # Log warning using initial config before levels are changed
+                logging.warning(
+                    f"Invalid LOG_LEVEL '{env_log_level}' provided. "
+                    f"Valid levels are {valid_levels}. Defaulting to CRITICAL."
+                )
+                target_level_name = "CRITICAL"
+        else:
+            # Default to CRITICAL if LOG_LEVEL is not set (effectively 'off')
+            target_level_name = "CRITICAL"
+
+    # Get the numeric logging level
+    numeric_level = getattr(logging, target_level_name, logging.CRITICAL)
+
+    # Configure the root logger
+    logging.getLogger().setLevel(numeric_level)
+
+    # Configure the main application logger
+    logger.setLevel(numeric_level)
+
+    # Configure third-party loggers
+    third_party_level = (
+        logging.WARNING if numeric_level > logging.INFO else numeric_level
+    )
+    logging.getLogger("crewai").setLevel(third_party_level)
+    logging.getLogger("LiteLLM").setLevel(third_party_level)
+    logging.getLogger("anyio").setLevel(logging.WARNING)  # Often noisy, keep at WARNING
+    logging.getLogger("httpx").setLevel(logging.WARNING)  # Often noisy, keep at WARNING
+    logging.getLogger("openai").setLevel(
+        logging.WARNING
+    )  # Often noisy, keep at WARNING
+
+    # Log the effective level being used (useful for debugging configuration)
+    logger.info(
+        f"Effective logging level set to: {target_level_name} ({numeric_level})"
+    )
+    # --- Logging Configuration END ---
 
     # Load environment variables (ensure this happens before agent init)
     load_dotenv()

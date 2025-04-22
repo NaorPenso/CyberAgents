@@ -19,7 +19,6 @@ from crewai import Agent, Crew, Task
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from agents.base_agent import BaseAgent
-from utils.llm_utils import create_central_llm
 
 logger = logging.getLogger(__name__)
 
@@ -191,9 +190,12 @@ class DefectReviewAgent(BaseAgent):
         "Secure Configuration",
     ]
 
-    def __init__(self, **kwargs):
-        """Initialize the Defect Review Agent."""
+    def __init__(self, llm: Any, **kwargs):
+        """Initialize the Defect Review Agent with the passed LLM."""
         try:
+            # Call BaseAgent init with the passed LLM
+            super().__init__(llm)
+
             # Initialize crew if provided
             self.crew = kwargs.get("crew", None)
 
@@ -215,36 +217,23 @@ class DefectReviewAgent(BaseAgent):
                 self.config = DefectReviewAgentConfig.from_dict(config_dict)
 
                 # Set up the agent with the configuration
-                kwargs["role"] = self.config.role
-                kwargs["goal"] = self.config.goal
-                kwargs["backstory"] = self.config.backstory
-                kwargs["verbose"] = self.config.verbose
-                kwargs["allow_delegation"] = self.config.allow_delegation
+                agent_kwargs = {}
+                agent_kwargs["role"] = self.config.role
+                agent_kwargs["goal"] = self.config.goal
+                agent_kwargs["backstory"] = self.config.backstory
+                agent_kwargs["verbose"] = self.config.verbose
+                agent_kwargs["allow_delegation"] = self.config.allow_delegation
+                agent_kwargs["llm"] = self.llm
 
                 if self.config.tools:
-                    kwargs["tools"] = self.config.tools
+                    # TODO: Instantiate tools based on names if needed
+                    # For now, assuming tools are passed differently or handled by CrewAI
+                    # agent_kwargs["tools"] = self.config.tools
+                    pass
 
                 # Optional configurations
                 if self.config.memory:
-                    kwargs["memory"] = True
-
-                if self.config.llm_config:
-                    kwargs["llm_config"] = {
-                        "config_list": [{"model": self.config.llm_config.model}],
-                        "temperature": self.config.llm_config.temperature,
-                        "cache": self.config.cache,
-                    }
-
-                    # Add API key and base URL if provided
-                    if self.config.llm_config.api_key:
-                        kwargs["llm_config"]["config_list"][0][
-                            "api_key"
-                        ] = self.config.llm_config.api_key
-
-                    if self.config.llm_config.base_url:
-                        kwargs["llm_config"]["config_list"][0][
-                            "base_url"
-                        ] = self.config.llm_config.base_url
+                    agent_kwargs["memory"] = True
 
                 # Process custom configuration options
                 self.include_code_examples = self.config.include_code_examples
@@ -255,11 +244,8 @@ class DefectReviewAgent(BaseAgent):
                 )
                 self.collaborative_agents = self.config.collaborative_agents
 
-            # Initialize the base agen
-            super().__init__()
-
             # Store the kwargs for use by child classes
-            self.agent_kwargs = kwargs
+            self.agent_kwargs = agent_kwargs
 
             # Create the crewai.Agent instance - THIS IS THE CRITICAL MISSING PART
             from utils.llm_utils import create_central_llm
@@ -269,19 +255,19 @@ class DefectReviewAgent(BaseAgent):
 
             # Create the CrewAI Agent instance
             self.agent = Agent(
-                role=kwargs.get("role", self.config.role),
-                goal=kwargs.get("goal", self.config.goal),
-                backstory=kwargs.get("backstory", self.config.backstory),
+                role=agent_kwargs.get("role", self.config.role),
+                goal=agent_kwargs.get("goal", self.config.goal),
+                backstory=agent_kwargs.get("backstory", self.config.backstory),
                 tools=agent_tools,
-                verbose=kwargs.get("verbose", self.config.verbose),
-                allow_delegation=kwargs.get(
+                verbose=agent_kwargs.get("verbose", self.config.verbose),
+                allow_delegation=agent_kwargs.get(
                     "allow_delegation", self.config.allow_delegation
                 ),
-                memory=kwargs.get("memory", self.config.memory),
-                max_iter=kwargs.get("max_iterations", self.config.max_iterations),
-                max_rpm=kwargs.get("max_rpm", self.config.max_rpm),
-                cache=kwargs.get("cache", self.config.cache),
-                llm=create_central_llm(),
+                memory=agent_kwargs.get("memory", self.config.memory),
+                max_iter=agent_kwargs.get("max_iterations", self.config.max_iterations),
+                max_rpm=agent_kwargs.get("max_rpm", self.config.max_rpm),
+                cache=agent_kwargs.get("cache", self.config.cache),
+                llm=self.llm,
             )
 
             # Log success for debugging
@@ -299,6 +285,14 @@ class DefectReviewAgent(BaseAgent):
             logger.error(f"Error initializing Defect Review Agent: {str(e)}")
             logger.error(traceback.format_exc())
             raise
+
+    def get_agent(self) -> Agent:
+        """Return the initialized crewai Agent instance."""
+        # Ensure the agent has been initialized before returning
+        if not hasattr(self, "agent") or self.agent is None:
+            logger.error("Attempted to get agent before it was initialized.")
+            raise AttributeError("Agent has not been initialized properly.")
+        return self.agent
 
     def _perform_collaborative_analysis(
         self, finding: Dict[str, Any]
