@@ -55,7 +55,7 @@ opentelemetry-instrumentation-asgi = "0.52b1"
 opentelemetry-instrumentation-fastapi = "0.52b1"
 opentelemetry-semantic-conventions = "0.52b1"
 opentelemetry-util-http = "0.52b1"
-boto3 = "^1.37.33"
+boto3 = "^1.38.8"
 azure-mgmt-frontdoor = "^1.2.0"
 azure-identity = "^1.21.0"
 langchain-community = {extras = ["cerebras"], version = "^0.3.21"}
